@@ -44,6 +44,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintCallable, Category="Skelot|实例", meta=(WorldContext="WorldContextObject", AutoCreateRefTerm = "Transform", DisplayName = "创建实例"))
 	static FSkelotInstanceHandle Skelot_CreateInstance(const UObject* WorldContextObject, const FTransform& Transform, USkelotRenderParams* RenderParams, UObject* UserObject);
+	//////////////////////////////////////////////////////////////////////////
+	UFUNCTION(BlueprintCallable, Category="Skelot|实例", meta=(WorldContext="WorldContextObject", DisplayName = "批量创建实例"))
+	static void Skelot_CreateInstances(const UObject* WorldContextObject, const TArray<FTransform>& Transforms, USkelotRenderParams* RenderParams, TArray<FSkelotInstanceHandle>& OutHandles);
 
 	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintCallable, Category="Skelot|动画", meta=(WorldContext="WorldContextObject", DisplayName = "播放动画"))
@@ -70,6 +73,26 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintCallable, Category="Skelot|渲染", meta=(WorldContext="WorldContextObject", DisplayName = "附加多个网格体"))
 	static void Skelot_AttachMeshes(const UObject* WorldContextObject, FSkelotInstanceHandle Handle, const TArray<USkeletalMesh*>& Meshes, bool bAttach = true);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Collision Channel API
+	UFUNCTION(BlueprintCallable, Category="Skelot|碰撞", meta=(WorldContext="WorldContextObject", DisplayName = "设置实例碰撞通道"))
+	static void Skelot_SetInstanceCollisionChannel(const UObject* WorldContextObject, int32 InstanceIndex, ESkelotCollisionChannel Channel);
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Skelot|碰撞", meta=(WorldContext="WorldContextObject", DisplayName = "获取实例碰撞通道"))
+	static ESkelotCollisionChannel Skelot_GetInstanceCollisionChannel(const UObject* WorldContextObject, int32 InstanceIndex);
+	UFUNCTION(BlueprintCallable, Category="Skelot|碰撞", meta=(WorldContext="WorldContextObject", DisplayName = "设置实例碰撞通道(句柄)"))
+	static void Skelot_SetInstanceCollisionChannelByHandle(const UObject* WorldContextObject, FSkelotInstanceHandle Handle, ESkelotCollisionChannel Channel);
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Skelot|碰撞", meta=(WorldContext="WorldContextObject", DisplayName = "获取实例碰撞通道(句柄)"))
+	static ESkelotCollisionChannel Skelot_GetInstanceCollisionChannelByHandle(const UObject* WorldContextObject, FSkelotInstanceHandle Handle);
+
+	UFUNCTION(BlueprintCallable, Category="Skelot|碰撞", meta=(WorldContext="WorldContextObject", DisplayName = "设置实例碰撞掩码"))
+	static void Skelot_SetInstanceCollisionMask(const UObject* WorldContextObject, int32 InstanceIndex, uint8 Mask);
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Skelot|碰撞", meta=(WorldContext="WorldContextObject", DisplayName = "获取实例碰撞掩码"))
+	static uint8 Skelot_GetInstanceCollisionMask(const UObject* WorldContextObject, int32 InstanceIndex);
+	UFUNCTION(BlueprintCallable, Category="Skelot|碰撞", meta=(WorldContext="WorldContextObject", DisplayName = "设置实例碰撞掩码(句柄)"))
+	static void Skelot_SetInstanceCollisionMaskByHandle(const UObject* WorldContextObject, FSkelotInstanceHandle Handle, uint8 Mask);
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Skelot|碰撞", meta=(WorldContext="WorldContextObject", DisplayName = "获取实例碰撞掩码(句柄)"))
+	static uint8 Skelot_GetInstanceCollisionMaskByHandle(const UObject* WorldContextObject, FSkelotInstanceHandle Handle);
 
 
 	//////////////////////////////////////////////////////////////////////////

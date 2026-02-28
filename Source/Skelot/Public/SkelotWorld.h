@@ -125,6 +125,11 @@ public:
 	FSkelotInstanceHandle CreateInstance(const FTransform& Transform, FSetElementId DescId);
 
 	//////////////////////////////////////////////////////////////////////////
+	//batch create multiple Skelot Instances, more efficient than calling CreateInstance in a loop
+	void CreateInstances(const TArray<FTransform>& Transforms, const FSkelotInstanceRenderDesc& Desc, TArray<FSkelotInstanceHandle>& OutHandles);
+	void CreateInstances(const TArray<FTransform>& Transforms, USkelotRenderParams* RenderParams, TArray<FSkelotInstanceHandle>& OutHandles);
+
+	//////////////////////////////////////////////////////////////////////////
 	//destroy an instance
 	void DestroyInstance(int32 InstanceIndex);
 	void DestroyInstance(FSkelotInstanceHandle H);
@@ -244,6 +249,27 @@ public:
 	void SetInstanceVelocities(const TArray<int32>& InstanceIndices, const TArray<FVector3f>& Velocities);
 	//batch set velocities using handles
 	void SetInstanceVelocities(const TArray<FSkelotInstanceHandle>& Handles, const TArray<FVector3f>& Velocities);
+
+	//////////////////////////////////////////////////////////////////////////
+	// Collision Channel API - for PBD collision and RVO avoidance systems
+
+	//returns collision channel of the instance (0-7, maps to ESkelotCollisionChannel)
+	inline uint8 GetInstanceCollisionChannel(int32 InstanceIndex) const { return SOA.CollisionChannels[InstanceIndex]; }
+	//returns collision channel of the instance (handle version)
+	uint8 GetInstanceCollisionChannel(FSkelotInstanceHandle H) const;
+	//sets collision channel of the instance
+	inline void SetInstanceCollisionChannel(int32 InstanceIndex, uint8 Channel) { SOA.CollisionChannels[InstanceIndex] = Channel; }
+	//sets collision channel of the instance (handle version)
+	void SetInstanceCollisionChannel(FSkelotInstanceHandle H, uint8 Channel);
+
+	//returns collision mask of the instance (bit flags for which channels to collide with)
+	inline uint8 GetInstanceCollisionMask(int32 InstanceIndex) const { return SOA.CollisionMasks[InstanceIndex]; }
+	//returns collision mask of the instance (handle version)
+	uint8 GetInstanceCollisionMask(FSkelotInstanceHandle H) const;
+	//sets collision mask of the instance
+	inline void SetInstanceCollisionMask(int32 InstanceIndex, uint8 Mask) { SOA.CollisionMasks[InstanceIndex] = Mask; }
+	//sets collision mask of the instance (handle version)
+	void SetInstanceCollisionMask(FSkelotInstanceHandle H, uint8 Mask);
 
 	//internal
 	FSkelotAttachParentData& GetOrCreateInstanceAttachParentData(int32 InstanceIndex);

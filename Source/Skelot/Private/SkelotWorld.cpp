@@ -1141,6 +1141,26 @@ FSkelotInstanceHandle ASkelotWorld::CreateInstance(const FTransform& Transform, 
 	return FSkelotInstanceHandle{ InstanceIdx, SOA.Slots[InstanceIdx].Version };
 }
 
+void ASkelotWorld::CreateInstances(const TArray<FTransform>& Transforms, const FSkelotInstanceRenderDesc& Desc, TArray<FSkelotInstanceHandle>& OutHandles)
+{
+	FSetElementId DescId = Impl()->FindOrAddDesc(Desc);
+	OutHandles.Reset();
+	OutHandles.Reserve(Transforms.Num());
+	for (const FTransform& Transform : Transforms)
+	{
+		OutHandles.Add(CreateInstance(Transform, DescId));
+	}
+}
+
+void ASkelotWorld::CreateInstances(const TArray<FTransform>& Transforms, USkelotRenderParams* RenderParams, TArray<FSkelotInstanceHandle>& OutHandles)
+{
+	OutHandles.Reset();
+	if (!RenderParams)
+		return;
+
+	CreateInstances(Transforms, RenderParams->Data, OutHandles);
+}
+
 void ASkelotWorld::DestroyInstance(FSkelotInstanceHandle H)
 {
 	if (!IsHandleValid(H))
@@ -1201,6 +1221,35 @@ void ASkelotWorld::SetInstanceVelocities(const TArray<FSkelotInstanceHandle>& Ha
 		{
 			SOA.Velocities[Handles[i].InstanceIndex] = Velocities[i];
 		}
+	}
+}
+
+//////////////////////////////////////////////////////////////////////////
+// Collision Channel API
+
+uint8 ASkelotWorld::GetInstanceCollisionChannel(FSkelotInstanceHandle H) const
+{
+	return IsHandleValid(H) ? SOA.CollisionChannels[H.InstanceIndex] : 0;
+}
+
+void ASkelotWorld::SetInstanceCollisionChannel(FSkelotInstanceHandle H, uint8 Channel)
+{
+	if (IsHandleValid(H))
+	{
+		SOA.CollisionChannels[H.InstanceIndex] = Channel;
+	}
+}
+
+uint8 ASkelotWorld::GetInstanceCollisionMask(FSkelotInstanceHandle H) const
+{
+	return IsHandleValid(H) ? SOA.CollisionMasks[H.InstanceIndex] : 0;
+}
+
+void ASkelotWorld::SetInstanceCollisionMask(FSkelotInstanceHandle H, uint8 Mask)
+{
+	if (IsHandleValid(H))
+	{
+		SOA.CollisionMasks[H.InstanceIndex] = Mask;
 	}
 }
 

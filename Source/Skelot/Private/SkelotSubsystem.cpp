@@ -391,6 +391,91 @@ FSkelotInstanceHandle USkelotWorldSubsystem::Skelot_CreateInstance(const UObject
 	return FSkelotInstanceHandle{};
 }
 
+void USkelotWorldSubsystem::Skelot_CreateInstances(const UObject* WorldContextObject, const TArray<FTransform>& Transforms, USkelotRenderParams* RenderParams, TArray<FSkelotInstanceHandle>& OutHandles)
+{
+	OutHandles.Reset();
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+	{
+		OutHandles.Reserve(Transforms.Num());
+		for (const FTransform& Transform : Transforms)
+		{
+			FSkelotInstanceHandle H = Singleton->CreateInstance(Transform, RenderParams);
+			OutHandles.Add(H);
+		}
+	}
+}
+
+//////////////////////////////////////////////////////////////////////////
+// Collision Channel API Implementation
+
+void USkelotWorldSubsystem::Skelot_SetInstanceCollisionChannel(const UObject* WorldContextObject, int32 InstanceIndex, ESkelotCollisionChannel Channel)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+	{
+		Singleton->SetInstanceCollisionChannel(InstanceIndex, static_cast<uint8>(Channel));
+	}
+}
+
+ESkelotCollisionChannel USkelotWorldSubsystem::Skelot_GetInstanceCollisionChannel(const UObject* WorldContextObject, int32 InstanceIndex)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+	{
+		return static_cast<ESkelotCollisionChannel>(Singleton->GetInstanceCollisionChannel(InstanceIndex));
+	}
+	return ESkelotCollisionChannel::Channel0;
+}
+
+void USkelotWorldSubsystem::Skelot_SetInstanceCollisionChannelByHandle(const UObject* WorldContextObject, FSkelotInstanceHandle Handle, ESkelotCollisionChannel Channel)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject, Handle))
+	{
+		Singleton->SetInstanceCollisionChannel(Handle, static_cast<uint8>(Channel));
+	}
+}
+
+ESkelotCollisionChannel USkelotWorldSubsystem::Skelot_GetInstanceCollisionChannelByHandle(const UObject* WorldContextObject, FSkelotInstanceHandle Handle)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject, Handle))
+	{
+		return static_cast<ESkelotCollisionChannel>(Singleton->GetInstanceCollisionChannel(Handle));
+	}
+	return ESkelotCollisionChannel::Channel0;
+}
+
+void USkelotWorldSubsystem::Skelot_SetInstanceCollisionMask(const UObject* WorldContextObject, int32 InstanceIndex, uint8 Mask)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+	{
+		Singleton->SetInstanceCollisionMask(InstanceIndex, Mask);
+	}
+}
+
+uint8 USkelotWorldSubsystem::Skelot_GetInstanceCollisionMask(const UObject* WorldContextObject, int32 InstanceIndex)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+	{
+		return Singleton->GetInstanceCollisionMask(InstanceIndex);
+	}
+	return SkelotCollision::DefaultCollisionMask;
+}
+
+void USkelotWorldSubsystem::Skelot_SetInstanceCollisionMaskByHandle(const UObject* WorldContextObject, FSkelotInstanceHandle Handle, uint8 Mask)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject, Handle))
+	{
+		Singleton->SetInstanceCollisionMask(Handle, Mask);
+	}
+}
+
+uint8 USkelotWorldSubsystem::Skelot_GetInstanceCollisionMaskByHandle(const UObject* WorldContextObject, FSkelotInstanceHandle Handle)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject, Handle))
+	{
+		return Singleton->GetInstanceCollisionMask(Handle);
+	}
+	return SkelotCollision::DefaultCollisionMask;
+}
+
 UActorComponent* USkelotFunctionLib::SpawnComponent(const UObject* WorldContextObject, TSubclassOf<UActorComponent> Class, const FTransform& Transform)
 {
 	UActorComponent* Comp = NewObject<UActorComponent>(GetTransientPackage(), Class);
