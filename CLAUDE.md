@@ -13,6 +13,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **碰撞通道系统** - 8通道掩码过滤
 - **几何工具库** - 点位生成工具
 
+## 重要文档
+
+**实现前必读**：
+- `docs/IMPLEMENTATION_CHALLENGES.md` - **难点分析**（难度评估、风险矩阵、解决策略）
+- `docs/TECHNICAL_RESEARCH.md` - **技术预演**（代码模板、参数配置、算法实现）
+
 详细任务列表见 `docs/TASK_LIST.md`，API 清单见 `docs/API_CHECKLIST.md`。
 
 ## Workflow
