@@ -27,6 +27,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 1. **编译测试** - 运行编译脚本确保无编译错误
    ```powershell
+   # 快速编译检查（输出到临时目录，自动清理）
+   pwsh -ExecutionPolicy Bypass -File QuickCompile.ps1
+
+   # 完整打包（需要发布时使用）
    pwsh -ExecutionPolicy Bypass -File BuildPlugin_CN.ps1
    ```
 
@@ -50,17 +54,22 @@ Skelot is an Unreal Engine 5.6 plugin for **Instanced Skeletal Mesh Rendering**.
 
 ## Build Commands
 
-### Compile Plugin
+### Quick Compile Check (开发时使用)
 ```powershell
-# Run the Chinese-localized build script
+# 快速编译检查 - 只检查编译错误，输出到临时目录（自动清理）
+pwsh -ExecutionPolicy Bypass -File QuickCompile.ps1
+```
+
+### Full Package (发布时使用)
+```powershell
+# 完整打包 - 输出到 ../CompiledPlugin/
 pwsh -ExecutionPolicy Bypass -File BuildPlugin_CN.ps1
 
 # Or use the batch wrapper
 ./开始编译.bat
 ```
 
-The script uses UE's RunUAT to build the plugin:
-- Output: `../CompiledPlugin/`
+The scripts use UE's RunUAT to build the plugin:
 - Platform: Win64
 - Requires: UE 5.6, Visual Studio 2022 with C++ game development workload
 
