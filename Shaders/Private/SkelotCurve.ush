@@ -1,0 +1,54 @@
+// Copyright 2024 Lazy Marmot Games. All Rights Reserved.
+
+//following macros must be defined by CustomNode
+//#define CURVE_INDEX					//index of the curve to be sampled, -1 to sample 4 floats at once
+//#define CUSTOM_NODE_VS 0				//true if its vertex shader
+
+#if VF_SKELOT 
+
+#if CUSTOM_NODE_VS
+uint instanceId = Parameters.InstanceId;
+#else 
+uint instanceId = asuint(Parameters.PerInstanceParams.x);
+#endif
+
+uint dataIndex = SkelotVF.Instance_DataIndex[SkelotVF.InstanceOffset + instanceId];
+uint AnimationFrameIndex = SkelotVF.Instance_AnimationFrameIndices[dataIndex * 2 + 0];
+//Unused=>> uint PrevAnimationFrameIndex = SkelotVF.Instance_AnimationFrameIndices[instanceId * 2 + 1];
+
+#if CURVE_INDEX == -1
+return float4(
+	SkelotVF.CurveBuffer[AnimationFrameIndex * SkelotVF.CurveCount + 0],
+	SkelotVF.CurveBuffer[AnimationFrameIndex * SkelotVF.CurveCount + 1],
+	SkelotVF.CurveBuffer[AnimationFrameIndex * SkelotVF.CurveCount + 2],
+	SkelotVF.CurveBuffer[AnimationFrameIndex * SkelotVF.CurveCount + 3]);
+#else
+return SkelotVF.CurveBuffer[AnimationFrameIndex * SkelotVF.CurveCount + CURVE_INDEX];
+#endif
+
+
+#elif VF_SKELOT_NEW
+
+#if USES_PER_INSTANCE_CUSTOM_DATA && VF_USE_PRIMITIVE_SCENE_DATA 
+	uint AnimationFrameIndex = asuint(FirstPICD);
+	#if CURVE_INDEX == -1
+	return float4(
+		SkelotAC.CurveBuffer[AnimationFrameIndex * SkelotAC.CurveCount + 0],
+		SkelotAC.CurveBuffer[AnimationFrameIndex * SkelotAC.CurveCount + 1],
+		SkelotAC.CurveBuffer[AnimationFrameIndex * SkelotAC.CurveCount + 2],
+		SkelotAC.CurveBuffer[AnimationFrameIndex * SkelotAC.CurveCount + 3]);
+	#else
+	return SkelotAC.CurveBuffer[AnimationFrameIndex * SkelotAC.CurveCount + CURVE_INDEX];
+	#endif
+#endif
+
+#endif //VF_SKELOT
+
+
+#undef CURVE_INDEX
+#undef CUSTOM_NODE_VS
+
+
+
+
+

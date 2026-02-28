@@ -1,0 +1,77 @@
+# Visual Studio
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.suo
+*.user
+*.sdf
+*.opensdf
+*.pdb
+*.ilk
+
+# Visual Studio Code
+.vscode/
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+[Dd]ebugGame/
+[Dd]evelopment/
+[Bb]in/
+[Oo]bj/
+x64/
+x86/
+Build/
+*.log
+
+# Unreal Engine
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.dll
+*.exe
+Intermediate/
+Binaries/
+DerivedDataCache/
+Saved/
+*.sln
+*.xcodeproj
+*.xcworkspace
+*.VC.db
+*.VC.opendb
+*.pdb
+ipch/
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Archives
+*.zip
+*.rar
+*.7z
+*.tar.gz

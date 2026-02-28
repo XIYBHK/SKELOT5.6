@@ -1,0 +1,46 @@
+{
+	"FileVersion": 3,
+	"Version": 16,
+	"VersionName": "3.0",
+	"FriendlyName": "Skelot",
+	"Description": "Instanced Skeletal Mesh Rendering",
+	"Category": "Rendering",
+	"CreatedBy": "UPO33",
+	"CreatedByURL": "https://discord.gg/uVVyWbprnP",
+	"DocsURL": "",
+	"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/335a336fda3242fab2617756a4add1d6",
+	"SupportURL": "https://discord.gg/uVVyWbprnP",
+	"EngineVersion": "5.6.0",
+	"CanContainContent": true,
+	"Installed": true,
+	"Modules": [
+		{
+			"Name": "Skelot",
+			"Type": "Runtime",
+			"LoadingPhase": "PostConfigInit",
+			"PlatformAllowList": [
+				"Win64",
+				"Linux",
+				"Mac",
+				"Android",
+				"IOS"
+			]
+		},
+		{
+			"Name": "SkelotEd",
+			"Type": "Editor",
+			"LoadingPhase": "PostEngineInit",
+			"PlatformAllowList": [
+				"Win64",
+				"Linux",
+				"Mac"
+			]
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "Niagara",
+			"Enabled": true
+		}
+	]
+}

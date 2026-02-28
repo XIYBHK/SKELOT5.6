@@ -1,0 +1,98 @@
+// Copyright 2024 Lazy Marmot Games. All Rights Reserved.
+
+//following macros must be defined by CustomNode
+//#define CUSTOM_NODE_VS 0				//true if its vertex shader
+//#define CUSTOM_NODE_NUM_FLOAT 1		//Custom Node OutputType
+//#define CUSTOM_NODE_FLOAT_OFFSET 0	//offset to be used when we want to get more than 4 floats
+//FirstPICD								the value of PerInstanceCustomData[2] material expression, 
+
+//#Note : CustomMateialExpression's first arg is FMaterialVertexParameters or FMaterialPixelParameters Paramaters;
+//#Note : generated material template is included before generated vertex factory and it overrides USES_PER_INSTANCE_CUSTOM_DATA=1 that was set by Skelot VertexFactory, so we cant go HLSL only, we need that PerInstanceCustomData node.
+
+#ifndef CUSTOM_NODE_FLOAT_OFFSET
+#define CUSTOM_NODE_FLOAT_OFFSET 0
+#endif
+
+
+#if VF_SKELOT //legacy skelot vertex factory ? (uses custom buffers not GPUScene)
+
+
+#if CUSTOM_NODE_VS
+uint instanceId = Parameters.InstanceId;
+#else
+uint instanceId = asuint(Parameters.PerInstanceParams.x);
+#endif
+
+
+
+
+uint dataIndex = SkelotVF.Instance_DataIndex[SkelotVF.InstanceOffset + instanceId] * SkelotVF.NumCustomDataFloats;
+
+#if CUSTOM_NODE_NUM_FLOAT == 1
+return float(SkelotVF.Instance_CustomData[dataIndex]);
+#endif
+
+#if CUSTOM_NODE_NUM_FLOAT == 2
+return float2(
+	SkelotVF.Instance_CustomData[dataIndex + 0], 
+	SkelotVF.Instance_CustomData[dataIndex + 1]);
+#endif
+
+#if CUSTOM_NODE_NUM_FLOAT == 3
+return float3(
+	SkelotVF.Instance_CustomData[dataIndex + 0], 
+	SkelotVF.Instance_CustomData[dataIndex + 1],
+	SkelotVF.Instance_CustomData[dataIndex + 2]);
+#endif
+
+#if CUSTOM_NODE_NUM_FLOAT == 4
+return float4(
+	SkelotVF.Instance_CustomData[dataIndex + 0], 
+	SkelotVF.Instance_CustomData[dataIndex + 1],
+	SkelotVF.Instance_CustomData[dataIndex + 2],
+	SkelotVF.Instance_CustomData[dataIndex + 3]);
+#endif
+
+
+#elif VF_SKELOT_NEW //new vertex factory ? (uses GPUScene per instance custom data )
+
+
+#if CUSTOM_NODE_NUM_FLOAT == 1
+return GetPerInstanceCustomData(Parameters, CUSTOM_NODE_FLOAT_OFFSET + 2, DefaultValue);
+#endif
+
+#if CUSTOM_NODE_NUM_FLOAT == 2
+return float2(
+	GetPerInstanceCustomData(Parameters, CUSTOM_NODE_FLOAT_OFFSET + 2, DefaultValue.x),
+	GetPerInstanceCustomData(Parameters, CUSTOM_NODE_FLOAT_OFFSET + 3, DefaultValue.y));
+#endif
+
+#if CUSTOM_NODE_NUM_FLOAT == 3
+return float3(
+	GetPerInstanceCustomData(Parameters, CUSTOM_NODE_FLOAT_OFFSET + 2, DefaultValue.x),
+	GetPerInstanceCustomData(Parameters, CUSTOM_NODE_FLOAT_OFFSET + 3, DefaultValue.y),
+	GetPerInstanceCustomData(Parameters, CUSTOM_NODE_FLOAT_OFFSET + 4, DefaultValue.z));
+#endif
+
+#if CUSTOM_NODE_NUM_FLOAT == 4
+return float4(
+	GetPerInstanceCustomData(Parameters, CUSTOM_NODE_FLOAT_OFFSET + 2, DefaultValue.x),
+	GetPerInstanceCustomData(Parameters, CUSTOM_NODE_FLOAT_OFFSET + 3, DefaultValue.y),
+	GetPerInstanceCustomData(Parameters, CUSTOM_NODE_FLOAT_OFFSET + 4, DefaultValue.z),
+	GetPerInstanceCustomData(Parameters, CUSTOM_NODE_FLOAT_OFFSET + 5, DefaultValue.w));
+#endif
+
+#endif //VF_SKELOT
+
+
+
+#undef CUSTOM_NODE_VS
+#undef CUSTOM_NODE_NUM_FLOAT
+#undef CUSTOM_NODE_FLOAT_OFFSET
+
+//return DefaultValue;
+
+
+
+
+
