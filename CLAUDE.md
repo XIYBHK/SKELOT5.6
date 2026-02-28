@@ -109,3 +109,24 @@ SKELOT_WITH_GPUSCENE=1
 ## Dependencies
 - Niagara (required plugin)
 - Renderer module (private include paths used)
+
+## 开发注意事项
+
+详细开发注意事项见 `docs/DEV_NOTES.md`，关键规则如下：
+
+### 工具使用
+
+1. **Edit 工具必须先 Read** - 编辑任何文件前必须先使用 Read 工具读取，否则会报错
+2. **字符串精确匹配** - Edit 的 old_string 必须与文件内容完全一致（包括空行、缩进），建议从 Read 输出直接复制
+3. **Grep 结果处理** - Grep 输出包含行号前缀，复制代码时需去除
+
+### 代码规范
+
+1. **新增文件位置**：
+   - 头文件：`Source/Skelot/Public/` 或 `Source/SkelotEd/Public/`
+   - 源文件：`Source/Skelot/Private/` 或 `Source/SkelotEd/Private/`
+
+2. **头文件包含顺序**：预编译头 → 引擎头文件 → 项目头文件 → `.generated.h`
+
+3. **避免循环依赖**：使用前向声明 `class ClassName;` 替代 `#include`
+
