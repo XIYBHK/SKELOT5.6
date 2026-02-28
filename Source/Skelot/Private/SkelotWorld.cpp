@@ -196,6 +196,10 @@ public:
 		//velocity data for PBD collision and RVO avoidance
 		SOA.Velocities.AddZeroed(GrowSize);
 
+		//collision channel data (1 byte each): channel (0-7) and mask (bit flags)
+		SOA.CollisionChannels.AddZeroed(GrowSize);
+		SOA.CollisionMasks.AddZeroed(GrowSize);
+
 		SOA.ClusterData.AddDefaulted(GrowSize);
 		SOA.SubmeshIndices.AddZeroed(GrowSize * (MaxSubmeshPerInstance + 1));
 		SOA.UserData.AddZeroed(GrowSize);
@@ -1113,6 +1117,11 @@ FSkelotInstanceHandle ASkelotWorld::CreateInstance(const FTransform& Transform, 
 
 	//initialize velocity to zero
 	SOA.Velocities[InstanceIdx] = FVector3f::ZeroVector;
+
+	//initialize collision channel and mask to defaults
+	//default: Channel0 (value 0), mask 0xFF (collide with all channels)
+	SOA.CollisionChannels[InstanceIdx] = SkelotCollision::DefaultCollisionChannel;
+	SOA.CollisionMasks[InstanceIdx] = SkelotCollision::DefaultCollisionMask;
 
 	SOA.CurAnimFrames[InstanceIdx] = 0;
 	SOA.PreAnimFrames[InstanceIdx] = 0;
