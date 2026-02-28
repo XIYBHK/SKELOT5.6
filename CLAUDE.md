@@ -2,6 +2,42 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Context
+
+本项目是对 **Skelot** 插件的二次开发，目标是 1:1 复刻参考插件 (SkelotRbn) 的功能。参考文档位于 `docs/参考插件_说明文档.md`。
+
+核心扩展功能：
+- **PBD 碰撞系统** - 基于位置的动态碰撞
+- **ORCA/RVO 避障** - 人群避让算法
+- **空间检测系统** - 空间哈希网格查询
+- **碰撞通道系统** - 8通道掩码过滤
+- **几何工具库** - 点位生成工具
+
+详细任务列表见 `docs/TASK_LIST.md`，API 清单见 `docs/API_CHECKLIST.md`。
+
+## Workflow
+
+每个任务完成后必须遵循以下流程：
+
+1. **编译测试** - 运行编译脚本确保无编译错误
+   ```powershell
+   pwsh -ExecutionPolicy Bypass -File BuildPlugin_CN.ps1
+   ```
+
+2. **提交 Git** - 使用规范的提交信息
+   ```bash
+   git add -A
+   git commit -m "feat(module): 简短描述"
+   git push
+   ```
+
+提交规范：
+- `feat`: 新功能
+- `fix`: 修复 bug
+- `refactor`: 重构
+- `docs`: 文档更新
+- `test`: 测试相关
+
 ## Project Overview
 
 Skelot is an Unreal Engine 5.6 plugin for **Instanced Skeletal Mesh Rendering**. It enables rendering large numbers of skeletal meshes with GPU-driven animation, significantly improving performance compared to traditional USkeletalMeshComponent.
