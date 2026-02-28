@@ -193,6 +193,8 @@ public:
 		SOA.PrevRotations.AddZeroed(GrowSize);
 		SOA.PrevScales.AddZeroed(GrowSize);
 
+		//velocity data for PBD collision and RVO avoidance
+		SOA.Velocities.AddZeroed(GrowSize);
 
 		SOA.ClusterData.AddDefaulted(GrowSize);
 		SOA.SubmeshIndices.AddZeroed(GrowSize * (MaxSubmeshPerInstance + 1));
@@ -1109,6 +1111,8 @@ FSkelotInstanceHandle ASkelotWorld::CreateInstance(const FTransform& Transform, 
 	SOA.PrevRotations[InstanceIdx] = SOA.Rotations[InstanceIdx];
 	SOA.PrevScales[InstanceIdx]	   = SOA.Scales[InstanceIdx];
 
+	//initialize velocity to zero
+	SOA.Velocities[InstanceIdx] = FVector3f::ZeroVector;
 
 	SOA.CurAnimFrames[InstanceIdx] = 0;
 	SOA.PreAnimFrames[InstanceIdx] = 0;
@@ -1158,6 +1162,39 @@ void ASkelotWorld::DestroyInstance(int32 InstanceIndex)
 		Impl()->LowLevelDestroyInstance(InstanceIndex);
 	}
 }
+
+//////////////////////////////////////////////////////////////////////////
+// Velocity API
+
+void ASkelotWorld::SetInstanceVelocity(FSkelotInstanceHandle H, const FVector3f& V)
+{
+	if (IsHandleValid(H))
+	{
+		SOA.Velocities[H.InstanceIndex] = V;
+	}
+}
+
+void ASkelotWorld::SetInstanceVelocities(const TArray<int32>& InstanceIndices, const TArray<FVector3f>& Velocities)
+{
+	check(InstanceIndices.Num() == Velocities.Num());
+	for (int32 i = 0; i < InstanceIndices.Num(); i++)
+	{
+		SOA.Velocities[InstanceIndices[i]] = Velocities[i];
+	}
+}
+
+void ASkelotWorld::SetInstanceVelocities(const TArray<FSkelotInstanceHandle>& Handles, const TArray<FVector3f>& Velocities)
+{
+	check(Handles.Num() == Velocities.Num());
+	for (int32 i = 0; i < Handles.Num(); i++)
+	{
+		if (IsHandleValid(Handles[i]))
+		{
+			SOA.Velocities[Handles[i].InstanceIndex] = Velocities[i];
+		}
+	}
+}
+
 #if 0
 void ASkelotWorld::SetInstanceMaterial(int32 InstanceIndex, const USkeletalMesh* Mesh, int32 MaterialIndex, FName MaterialSlot, const UMaterialInterface* Material)
 {

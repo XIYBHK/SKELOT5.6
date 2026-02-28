@@ -1,4 +1,3 @@
 @echo off
 cd /d "%~dp0"
-python run_task.py
-pause
+pwsh -ExecutionPolicy Bypass -File run_task.ps1

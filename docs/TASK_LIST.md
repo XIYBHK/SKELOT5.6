@@ -27,7 +27,7 @@
 ### 1.1 数据结构扩展
 | 任务 | 优先级 | 状态 | 说明 |
 |------|--------|------|------|
-| 扩展 FSkelotInstancesSOA 添加速度数据 | P0 | ⬜ | 添加 `TArray<FVector3f> Velocities` |
+| 扩展 FSkelotInstancesSOA 添加速度数据 | P0 | ✅ | 添加 `TArray<FVector3f> Velocities` |
 | 扩展 FSkelotInstancesSOA 添加碰撞数据 | P0 | ⬜ | 添加碰撞通道(1字节)和碰撞掩码(1字节) |
 | 添加批量创建 API | P0 | ⬜ | `CreateInstances(TArray<FTransform>, RenderParams)` |
 | 添加批量销毁 API | P0 | ⬜ | `DestroyInstances(TArray<FSkelotInstanceHandle>)` |
@@ -35,9 +35,9 @@
 ### 1.2 移动系统基础
 | 任务 | 优先级 | 状态 | 说明 |
 |------|--------|------|------|
-| SetInstanceVelocity API | P0 | ⬜ | 设置单个实例速度 |
-| GetInstanceVelocity API | P0 | ⬜ | 获取单个实例速度 |
-| SetInstanceVelocities 批量API | P1 | ⬜ | 批量设置速度，性能优化 |
+| SetInstanceVelocity API | P0 | ✅ | 设置单个实例速度 |
+| GetInstanceVelocity API | P0 | ✅ | 获取单个实例速度 |
+| SetInstanceVelocities 批量API | P1 | ✅ | 批量设置速度，性能优化 |
 | 速度数据持久化 | P2 | ⬜ | SaveGame 支持 |
 
 ---
@@ -287,7 +287,7 @@
 
 | 阶段 | 总任务 | 已完成 | 进度 |
 |------|--------|--------|------|
-| Phase 1: 基础架构 | 8 | 0 | 0% |
+| Phase 1: 基础架构 | 8 | 4 | 50% |
 | Phase 1.5: 动画系统 | 5 | 0 | 0% |
 | Phase 2: 碰撞通道 | 10 | 0 | 0% |
 | Phase 2.5: 层级关系 | 4 | 0 | 0% |
@@ -298,7 +298,7 @@
 | Phase 7: 几何工具 | 14 | 0 | 0% |
 | Phase 8: 编辑器 | 7 | 0 | 0% |
 | Phase 9: 示例文档 | 7 | 0 | 0% |
-| **总计** | **108** | **3** | **3%** |
+| **总计** | **108** | **7** | **6%** |
 
 ---
 
@@ -323,6 +323,7 @@
 
 | 日期 | 更新内容 |
 |------|----------|
+| 2026-03-01 | 完成 Phase 1.1 速度数据扩展和 Phase 1.2 移动系统基础 API |
 | 2026-03-01 | 对比参考文档，补充遗漏任务：动画系统、层级关系、空间检测掩码过滤、几何工具细化 |
 | 2026-02-28 | 创建任务列表，完成技术调研 |
 

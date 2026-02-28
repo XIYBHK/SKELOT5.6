@@ -224,11 +224,27 @@ public:
 	}
 	//
 	inline void SetInstanceLocationAndRotation(int32 InstanceIndex, const FVector& L, const FQuat4f& Q)
-	{ 
+	{
 		SOA.Locations[InstanceIndex] = L;
 		SOA.Rotations[InstanceIndex] = Q;
 	}
-	
+
+	//////////////////////////////////////////////////////////////////////////
+	// Velocity API - for PBD collision and RVO avoidance systems
+
+	//returns velocity of the instance
+	inline FVector3f GetInstanceVelocity(int32 InstanceIndex) const { return SOA.Velocities[InstanceIndex]; }
+	//returns velocity of the instance (handle version)
+	FVector3f GetInstanceVelocity(FSkelotInstanceHandle H) const { return IsHandleValid(H) ? SOA.Velocities[H.InstanceIndex] : FVector3f::ZeroVector; }
+	//sets velocity of the instance
+	inline void SetInstanceVelocity(int32 InstanceIndex, const FVector3f& V) { SOA.Velocities[InstanceIndex] = V; }
+	//sets velocity of the instance (handle version)
+	void SetInstanceVelocity(FSkelotInstanceHandle H, const FVector3f& V);
+	//batch set velocities for multiple instances (performance optimized)
+	void SetInstanceVelocities(const TArray<int32>& InstanceIndices, const TArray<FVector3f>& Velocities);
+	//batch set velocities using handles
+	void SetInstanceVelocities(const TArray<FSkelotInstanceHandle>& Handles, const TArray<FVector3f>& Velocities);
+
 	//internal
 	FSkelotAttachParentData& GetOrCreateInstanceAttachParentData(int32 InstanceIndex);
 	FSkelotAttachParentData* GetInstanceAttachParentData(int32 InstanceIndex) const;

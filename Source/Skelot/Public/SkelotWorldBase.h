@@ -38,6 +38,44 @@ enum class ESkelotValidity : uint8
 	NotValid	UMETA(DisplayName="无效"),
 };
 
+// Skelot碰撞通道枚举 (8通道系统)
+// 用于控制实例间的碰撞检测
+UENUM(BlueprintType, meta = (DisplayName = "Skelot碰撞通道"))
+enum class ESkelotCollisionChannel : uint8
+{
+	Channel0 = 0	UMETA(DisplayName = "通道0 (值=0x01)"),
+	Channel1 = 1	UMETA(DisplayName = "通道1 (值=0x02)"),
+	Channel2 = 2	UMETA(DisplayName = "通道2 (值=0x04)"),
+	Channel3 = 3	UMETA(DisplayName = "通道3 (值=0x08)"),
+	Channel4 = 4	UMETA(DisplayName = "通道4 (值=0x10)"),
+	Channel5 = 5	UMETA(DisplayName = "通道5 (值=0x20)"),
+	Channel6 = 6	UMETA(DisplayName = "通道6 (值=0x40)"),
+	Channel7 = 7	UMETA(DisplayName = "通道7 (值=0x80)"),
+};
+
+// 碰撞通道工具函数
+namespace SkelotCollision
+{
+	// 将通道枚举转换为位掩码值
+	constexpr uint8 ChannelToMask(ESkelotCollisionChannel Channel)
+	{
+		return 1 << static_cast<uint8>(Channel);
+	}
+
+	// 检查两个实例是否应该碰撞
+	// 碰撞条件: (MaskA & (1<<ChannelB)) && (MaskB & (1<<ChannelA))
+	inline bool ShouldCollide(uint8 ChannelA, uint8 MaskA, uint8 ChannelB, uint8 MaskB)
+	{
+		return (MaskA & (1 << ChannelB)) && (MaskB & (1 << ChannelA));
+	}
+
+	// 默认碰撞掩码 (与所有通道碰撞)
+	constexpr uint8 DefaultCollisionMask = 0xFF;
+
+	// 默认碰撞通道
+	constexpr uint8 DefaultCollisionChannel = 0; // Channel0
+}
+
 
 // Skelot实例句柄
 USTRUCT(BlueprintType)
@@ -259,12 +297,18 @@ struct SKELOT_API FSkelotInstancesSOA
 	TArray<FQuat4f>			Rotations;
 	TArray<FVector3f>		Scales;
 
-	//previous frame transform of instances 
+	//previous frame transform of instances
 	TArray<FVector3d>		PrevLocations;
 	TArray<FQuat4f>			PrevRotations;
 	TArray<FVector3f>		PrevScales;
 
-	
+	//velocity of instances, used for PBD collision and RVO avoidance
+	TArray<FVector3f>		Velocities;
+
+	//collision channel of instances (0-7, maps to ESkelotCollisionChannel)
+	TArray<uint8>			CollisionChannels;
+	//collision mask of instances (bit flags for which channels to collide with)
+	TArray<uint8>			CollisionMasks;
 
 	//current animation frame index, (frame index could be in sequence range, transition, or dynamic pose)
 	TArray<int32>			CurAnimFrames;
