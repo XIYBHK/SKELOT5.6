@@ -2169,7 +2169,8 @@ void ASkelotWorld::RebuildSpatialGrid()
 {
 	if (bEnableSpatialGrid)
 	{
-		SpatialGrid.Rebuild(SOA, GetNumInstance());
+		// 使用分帧更新（来自预研文档的 FrameStride 方案）
+		SpatialGrid.RebuildIncremental(SOA, GetNumInstance());
 	}
 }
 

@@ -86,9 +86,17 @@ public:
 
 	// 空间网格实例
 	mutable FSkelotSpatialGrid SpatialGrid;
+
 	// 是否启用空间网格优化
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skelot|空间查询", meta = (DisplayName = "启用空间网格"))
 	bool bEnableSpatialGrid = true;
+
+	// 分帧更新步长（来自预研文档）
+	// 1 = 每帧完整更新（默认，最准确）
+	// 2 = 分2帧更新（降低50%计算量，数据有一帧延迟）
+	// 4 = 分4帧更新（降低75%计算量，数据有最多3帧延迟）
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skelot|空间查询", meta = (DisplayName = "分帧更新步长", ClampMin = "1", ClampMax = "4"))
+	int32 SpatialGridFrameStride = 1;
 	
 	DECLARE_DELEGATE_ThreeParams(FOnWorldActorTick, ASkelotWorld*, ELevelTick, float);
 	//
@@ -432,6 +440,18 @@ public:
 	 * @return 单元大小（厘米）
 	 */
 	float GetSpatialGridCellSize() const;
+
+	/**
+	 * 设置空间网格分帧更新步长（来自预研文档）
+	 * @param Stride 步长（1=每帧更新，2=分2帧更新降低50%计算，4=分4帧更新降低75%计算）
+	 */
+	void SetSpatialGridFrameStride(int32 Stride);
+
+	/**
+	 * 获取空间网格分帧更新步长
+	 * @return 步长
+	 */
+	int32 GetSpatialGridFrameStride() const;
 
 	/**
 	 * 重建空间网格（内部使用，每帧自动调用）

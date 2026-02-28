@@ -6,6 +6,8 @@
 FSkelotSpatialGrid::FSkelotSpatialGrid()
 	: CellSize(200.0f)  // 默认200厘米（2米）
 	, InvCellSize(1.0f / 200.0f)
+	, FrameStride(1)    // 默认每帧完整更新
+	, CurrentFrameIndex(0)
 	, TotalInstances(0)
 {
 }
@@ -18,6 +20,12 @@ void FSkelotSpatialGrid::SetCellSize(float InCellSize)
 		InvCellSize = 1.0f / CellSize;
 		Clear();
 	}
+}
+
+void FSkelotSpatialGrid::SetFrameStride(int32 Stride)
+{
+	FrameStride = FMath::Max(1, FMath::Min(Stride, 8));  // 限制 1-8
+	CurrentFrameIndex = 0;
 }
 
 void FSkelotSpatialGrid::Clear()
@@ -63,6 +71,42 @@ void FSkelotSpatialGrid::Rebuild(const FSkelotInstancesSOA& SOA, int32 NumInstan
 	}
 }
 
+void FSkelotSpatialGrid::RebuildIncremental(const FSkelotInstancesSOA& SOA, int32 NumInstances)
+{
+	// 基于 DetourCrowd 调研的简化方案：
+	// 不是分批更新（会导致数据不一致），而是每 N 帧重建一次
+	// FrameStride=1: 每帧重建
+	// FrameStride=2: 每 2 帧重建一次（降低 50% 计算量）
+	// FrameStride=4: 每 4 帧重建一次（降低 75% 计算量）
+	//
+	// 优点：
+	// 1. 简单实现，不会出错
+	// 2. 网格数据始终一致
+	// 3. 对大多数场景足够（群集 AI 不需要每帧精确位置）
+
+	if (FrameStride <= 1)
+	{
+		// 每帧更新
+		Rebuild(SOA, NumInstances);
+		return;
+	}
+
+	// 更新帧计数器
+	CurrentFrameIndex = (CurrentFrameIndex + 1) % FrameStride;
+
+	// 只有当 CurrentFrameIndex == 0 时才重建
+	if (CurrentFrameIndex == 0)
+	{
+		Rebuild(SOA, NumInstances);
+	}
+	// 否则跳过更新，使用上一帧的网格数据
+}
+
+void FSkelotSpatialGrid::ForceFullRebuild(const FSkelotInstancesSOA& SOA, int32 NumInstances)
+{
+	Rebuild(SOA, NumInstances);
+}
+
 const TArray<int32>* FSkelotSpatialGrid::GetCellInstances(const FIntVector& CellKey) const
 {
 	return GridCells.Find(CellKey);
@@ -79,7 +123,7 @@ void FSkelotSpatialGrid::QuerySphere(const FVector& Center, float Radius, TArray
 
 	FIntVector CenterCell = GetCellKey(Center);
 
-	// 计算半径平方用于距离检测
+	// 计算半径平方用于距离检测（避免 sqrt）
 	float RadiusSquared = Radius * Radius;
 
 	// 遍历可能重叠的所有网格单元
@@ -107,7 +151,7 @@ void FSkelotSpatialGrid::QuerySphere(const FVector& Center, float Radius, TArray
 							}
 						}
 
-						// 距离检测
+						// 距离检测（使用平方距离避免 sqrt）
 						FVector InstanceLocation = SOA ? FVector(SOA->Locations[InstanceIndex]) : FVector::ZeroVector;
 						float DistSquared = (InstanceLocation - Center).SizeSquared();
 

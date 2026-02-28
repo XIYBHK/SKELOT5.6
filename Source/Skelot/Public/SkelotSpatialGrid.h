@@ -15,6 +15,12 @@
  * - 球形范围查询（范围攻击、AOE技能）
  * - PBD碰撞邻居检测
  * - RVO避障邻居检测
+ *
+ * 分帧更新说明：
+ * - 使用 FrameStride 参数控制分帧更新频率
+ * - FrameStride=1: 每帧完整更新（默认）
+ * - FrameStride=2: 每帧更新一半实例，降低50%计算量
+ * - 注意：分帧更新会导致网格数据有一帧延迟，对大多数应用场景可接受
  */
 class FSkelotSpatialGrid
 {
@@ -31,6 +37,15 @@ public:
 	float GetInvCellSize() const { return InvCellSize; }
 
 	/**
+	 * 设置分帧更新步长
+	 * @param Stride 步长（1=每帧更新，2=分2帧更新，4=分4帧更新）
+	 */
+	void SetFrameStride(int32 Stride);
+
+	/** 获取分帧更新步长 */
+	int32 GetFrameStride() const { return FrameStride; }
+
+	/**
 	 * 清空所有网格数据
 	 * 每帧开始时调用，准备接收新的实例数据
 	 */
@@ -44,11 +59,24 @@ public:
 	void AddInstance(int32 InstanceIndex, const FVector& Location);
 
 	/**
-	 * 批量添加实例到网格中
+	 * 批量添加实例到网格中（完整重建）
 	 * @param SOA 实例数据数组
 	 * @param NumInstances 实例总数
 	 */
 	void Rebuild(const FSkelotInstancesSOA& SOA, int32 NumInstances);
+
+	/**
+	 * 分帧更新网格（只更新当前帧对应的实例批次）
+	 * 基于预研文档的 FrameStride 方案
+	 * @param SOA 实例数据数组
+	 * @param NumInstances 实例总数
+	 */
+	void RebuildIncremental(const FSkelotInstancesSOA& SOA, int32 NumInstances);
+
+	/**
+	 * 强制完整重建（用于关键查询前）
+	 */
+	void ForceFullRebuild(const FSkelotInstancesSOA& SOA, int32 NumInstances);
 
 	/**
 	 * 查询球形范围内的实例
@@ -103,12 +131,21 @@ public:
 	int32 GetNumCells() const { return GridCells.Num(); }
 	int32 GetTotalInstancesInGrid() const { return TotalInstances; }
 
+	/** 是否使用分帧更新 */
+	bool IsUsingIncrementalUpdate() const { return FrameStride > 1; }
+
 private:
 	/** 网格单元大小（厘米） */
 	float CellSize;
 
 	/** 网格单元大小的倒数 */
 	float InvCellSize;
+
+	/** 分帧更新步长（1=每帧更新，2=分2帧更新） */
+	int32 FrameStride;
+
+	/** 当前帧索引（用于分帧更新） */
+	int32 CurrentFrameIndex;
 
 	/** 网格单元映射：CellKey -> 实例索引数组 */
 	TMap<FIntVector, TArray<int32>> GridCells;

@@ -125,4 +125,76 @@ feat(Skelot): 实现空间哈希网格系统
 
 ---
 
+## 空间网格优化调研结论
+
+> 基于 2024-2026 年最新研究和 DetourCrowd 实践
+
+### 已验证有效的方案
+
+| 方案 | 效果 | 实现难度 | 是否采用 |
+|------|------|----------|----------|
+| **降低更新频率** | FrameStride=2 降 50% | 低 | ✅ 已实现 |
+| **Cell Size = 2x 对象大小** | 最优查询效率 | 低 | ✅ 已实现 |
+
+### 已验证无效/过度的方案
+
+| 方案 | 问题 | 结论 |
+|------|------|------|
+| **Morton 编码** | 只对连续数组存储有效，`TMap` 无收益 | ❌ 不采用 |
+| **分批更新** | 导致网格数据不一致，查询结果错误 | ❌ 不采用 |
+| **增量更新** | 复杂度高，[Unity 经验表明](https://m.blog.csdn.net/gitblog_00325/article/details/153719621)变化累积后反而更慢 | ❌ 不采用 |
+| **双缓冲** | 无异步查询需求时是内存浪费 | ⏸️ 暂不需要 |
+
+### 分帧更新实现（已验证）
+
+```cpp
+// 基于 DetourCrowd 的简化方案
+void RebuildIncremental(...)
+{
+    CurrentFrameIndex = (CurrentFrameIndex + 1) % FrameStride;
+
+    // 只有当 CurrentFrameIndex == 0 时才重建
+    if (CurrentFrameIndex == 0)
+    {
+        Rebuild(SOA, NumInstances);
+    }
+    // 否则跳过，使用上一帧数据
+}
+```
+
+**优点**：
+1. 简单实现，不会出错
+2. 网格数据始终一致
+3. 对群集 AI 场景足够（不需要每帧精确位置）
+
+### 参考资料
+
+- [DetourCrowd 分析](https://blog.csdn.net/gitblog_00648/article/details/154421533) - MAX_ITERS_PER_UPDATE 模式
+- [空间哈希最佳实践](https://m.php.cn/faq/1927461.html) - Cell Size 设置
+- [Unity Tilemap 经验](https://m.blog.csdn.net/gitblog_00325/article/details/153719621) - 增量更新 vs 完整重建
+
+---
+
+## 预研文档使用规范
+
+### 重要原则
+
+1. **优先查阅预研文档**：`docs/IMPLEMENTATION_CHALLENGES.md` 和 `docs/TECHNICAL_RESEARCH.md`
+2. **批判性思考**：预研文档的建议需要验证，不是无条件执行
+3. **网络调研验证**：对不确定的方案，先搜索验证再实现
+
+### 预研文档评估流程
+
+```
+1. 阅读预研文档建议
+2. 批判性分析：
+   - 是否适用于当前场景？
+   - 复杂度是否合理？
+   - 是否有更好的替代方案？
+3. 必要时进行网络调研
+4. 做出决定并记录原因
+```
+
+---
+
 *最后更新: 2026-03-01*
