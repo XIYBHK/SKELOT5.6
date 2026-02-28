@@ -118,6 +118,34 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintCallable, Category="Skelot|工具", meta=(WorldContext="WorldContextObject", AutoCreateRefTerm = "Center", DisplayName = "查询球形重叠位置"))
 	static void SkelotQueryLocationOverlappingSphere(const UObject* WorldContextObject, const FVector& Center, float Radius, TArray<FSkelotInstanceHandle>& Instances);
+
+	/**
+	 * 查询球形范围内的实例（带碰撞掩码过滤）
+	 * @param WorldContextObject 世界上下文对象
+	 * @param Center 球心位置（世界坐标）
+	 * @param Radius 球体半径（厘米）
+	 * @param CollisionMask 碰撞掩码过滤，0xFF表示不过滤
+	 * @param Instances 输出实例句柄数组
+	 */
+	UFUNCTION(BlueprintCallable, Category="Skelot|工具", meta=(WorldContext="WorldContextObject", AutoCreateRefTerm = "Center", DisplayName = "查询球形重叠位置(带掩码)"))
+	static void SkelotQueryLocationOverlappingSphereWithMask(const UObject* WorldContextObject, const FVector& Center, float Radius, uint8 CollisionMask, TArray<FSkelotInstanceHandle>& Instances);
+
+	/**
+	 * 设置空间网格单元大小
+	 * @param WorldContextObject 世界上下文对象
+	 * @param CellSize 单元大小（厘米），建议设为查询半径的1-2倍
+	 */
+	UFUNCTION(BlueprintCallable, Category="Skelot|空间查询", meta=(WorldContext="WorldContextObject", DisplayName = "设置空间网格单元大小"))
+	static void Skelot_SetSpatialGridCellSize(const UObject* WorldContextObject, float CellSize);
+
+	/**
+	 * 获取空间网格单元大小
+	 * @param WorldContextObject 世界上下文对象
+	 * @return 单元大小（厘米）
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Skelot|空间查询", meta=(WorldContext="WorldContextObject", DisplayName = "获取空间网格单元大小"))
+	static float Skelot_GetSpatialGridCellSize(const UObject* WorldContextObject);
+
 	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintCallable, Category="Skelot|工具", meta=(WorldContext="WorldContextObject", DisplayName = "移除无效句柄"))
 	static void Skelot_RemoveInvalidHandles(const UObject* WorldContextObject, bool bMaintainOrder, TArray<FSkelotInstanceHandle>& Handles);

@@ -4,6 +4,7 @@
 
 
 #include "SkelotWorldBase.h"
+#include "SkelotSpatialGrid.h"
 
 
 
@@ -78,6 +79,16 @@ public:
 	//
 	UPROPERTY(Transient)
 	TMap<FSkelotInstanceHandle, FSkelotInstanceTimerData> TimerMap;
+
+	//////////////////////////////////////////////////////////////////////////
+	// Spatial Grid for efficient spatial queries
+	// 空间网格 - 用于高效的空间查询（PBD碰撞、RVO避障、范围攻击等）
+
+	// 空间网格实例
+	mutable FSkelotSpatialGrid SpatialGrid;
+	// 是否启用空间网格优化
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skelot|空间查询", meta = (DisplayName = "启用空间网格"))
+	bool bEnableSpatialGrid = true;
 	
 	DECLARE_DELEGATE_ThreeParams(FOnWorldActorTick, ASkelotWorld*, ELevelTick, float);
 	//
@@ -399,6 +410,34 @@ public:
 
 	
 	void QueryLocationOverlappingSphere(const FVector& Center, float Radius, TArray<FSkelotInstanceHandle>& OutInstances);
+
+	/**
+	 * 查询球形范围内的实例（带碰撞掩码过滤）
+	 * @param Center 球心位置（世界坐标）
+	 * @param Radius 球体半径（厘米）
+	 * @param OutInstances 输出实例句柄数组
+	 * @param CollisionMask 碰撞掩码过滤，0xFF表示不过滤
+	 */
+	void QueryLocationOverlappingSphereWithMask(const FVector& Center, float Radius, TArray<FSkelotInstanceHandle>& OutInstances, uint8 CollisionMask);
+
+	/**
+	 * 设置空间网格单元大小（厘米）
+	 * 建议：设为常用查询半径的1-2倍
+	 * @param CellSize 单元大小（厘米）
+	 */
+	void SetSpatialGridCellSize(float CellSize);
+
+	/**
+	 * 获取空间网格单元大小（厘米）
+	 * @return 单元大小（厘米）
+	 */
+	float GetSpatialGridCellSize() const;
+
+	/**
+	 * 重建空间网格（内部使用，每帧自动调用）
+	 */
+	void RebuildSpatialGrid();
+
 	void RemoveInvalidHandles(bool bMaintainOrder, TArray<FSkelotInstanceHandle>& InOutHandles);
 	//function to get handles of all the valid instances
 	void GetAllHandles(TArray<FSkelotInstanceHandle>& OutHandles);

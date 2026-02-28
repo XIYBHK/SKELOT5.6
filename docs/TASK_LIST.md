@@ -47,15 +47,15 @@
 ### 1.5.1 动画播放参数
 | 任务 | 优先级 | 状态 | 说明 |
 |------|--------|------|------|
-| 定义 FSkelotAnimPlayParamsEx | P0 | ⬜ | Animation, bLoop, PlayRate, StartPosition, BlendInTime |
-| 扩展 InstancePlayAnimation | P0 | ⬜ | 支持新的参数结构体 |
-| 实现 BlendInTime 混合 | P1 | ⬜ | 动画过渡混合时间支持 |
+| 定义 FSkelotAnimPlayParamsEx | P0 | ✅ | Animation, bLoop, PlayRate, StartPosition, BlendInTime |
+| 扩展 InstancePlayAnimation | P0 | ✅ | 支持新的参数结构体 |
+| 实现 BlendInTime 混合 | P1 | ✅ | 动画过渡混合时间支持 |
 
 ### 1.5.2 动画蓝图 API
 | 任务 | 优先级 | 状态 | 说明 |
 |------|--------|------|------|
-| Skelot_PlayAnimation | P0 | ⬜ | 蓝图封装，返回动画长度 |
-| Skelot_GetAnimCollection | P1 | ⬜ | 获取实例关联的动画集 |
+| Skelot_PlayAnimation | P0 | ✅ | 蓝图封装，返回动画长度 |
+| Skelot_GetAnimCollection | P1 | ✅ | 获取实例关联的动画集 |
 
 ---
 
@@ -64,9 +64,9 @@
 ### 2.1 碰撞通道数据结构
 | 任务 | 优先级 | 状态 | 说明 |
 |------|--------|------|------|
-| 定义碰撞通道枚举 (8通道) | P0 | ⬜ | Channel0-Channel7, 值 0x01-0x80 |
-| 扩展 SlotData 添加碰撞数据 | P0 | ⬜ | 添加 CollisionChannel(3bit) + CollisionMask(8bit) |
-| 实现碰撞判定逻辑 | P0 | ⬜ | `(MaskA & (1<<ChannelB)) && (MaskB & (1<<ChannelA))` |
+| 定义碰撞通道枚举 (8通道) | P0 | ✅ | Channel0-Channel7, 值 0x01-0x80 |
+| 扩展 SlotData 添加碰撞数据 | P0 | ✅ | 添加 CollisionChannel(3bit) + CollisionMask(8bit) |
+| 实现碰撞判定逻辑 | P0 | ✅ | `(MaskA & (1<<ChannelB)) && (MaskB & (1<<ChannelA))` |
 
 ### 2.2 碰撞通道 API
 | 任务 | 优先级 | 状态 | 说明 |
@@ -84,10 +84,10 @@
 ### 2.5.1 层级操作 API
 | 任务 | 优先级 | 状态 | 说明 |
 |------|--------|------|------|
-| Skelot_AttachChild | P0 | ⬜ | 蓝图封装，支持 bKeepWorldTransform |
-| Skelot_DetachFromParent | P0 | ⬜ | 蓝图封装 |
-| Skelot_GetChildren | P1 | ⬜ | 新增：获取子实例数组 |
-| Skelot_GetParent | P1 | ⬜ | 新增：获取父实例句柄 |
+| Skelot_AttachChild | P0 | ✅ | 蓝图封装，支持 bKeepWorldTransform |
+| Skelot_DetachFromParent | P0 | ✅ | 蓝图封装 |
+| Skelot_GetChildren | P1 | ✅ | 新增：获取子实例数组 |
+| Skelot_GetParent | P1 | ✅ | 新增：获取父实例句柄 |
 
 ---
 
@@ -96,17 +96,17 @@
 ### 3.1 空间网格实现
 | 任务 | 优先级 | 状态 | 说明 |
 |------|--------|------|------|
-| 设计空间哈希网格结构 | P0 | ⬜ | 参考: Spatial Hashing, O(n) 复杂度 |
-| 实现网格单元大小配置 | P0 | ⬜ | SetSpatialGridCellSize/GetSpatialGridCellSize |
-| 实现实例到网格的映射 | P0 | ⬜ | 每帧更新实例所在网格单元 |
-| 实现邻居查询 | P0 | ⬜ | 获取当前单元+相邻单元的实例 |
+| 设计空间哈希网格结构 | P0 | ✅ | 参考: Spatial Hashing, O(n) 复杂度 |
+| 实现网格单元大小配置 | P0 | ✅ | SetSpatialGridCellSize/GetSpatialGridCellSize |
+| 实现实例到网格的映射 | P0 | ✅ | 每帧更新实例所在网格单元 |
+| 实现邻居查询 | P0 | ✅ | 获取当前单元+相邻单元的实例 |
 
 ### 3.2 空间查询 API
 | 任务 | 优先级 | 状态 | 说明 |
 |------|--------|------|------|
-| QueryLocationOverlappingSphere | P0 | ⬜ | 球形范围查询，支持掩码过滤 |
+| QueryLocationOverlappingSphere | P0 | ✅ | 球形范围查询，支持掩码过滤 |
 | QueryLocationOverlappingBox | P1 | ⬜ | 盒形范围查询 |
-| QuerySphere 掩码过滤 | P0 | ⬜ | CollisionMask 参数过滤结果 |
+| QuerySphere 掩码过滤 | P0 | ✅ | CollisionMask 参数过滤结果 |
 | QueryBox 掩码过滤 | P1 | ⬜ | CollisionMask 参数过滤结果 |
 | 空间网格调试可视化 | P2 | ⬜ | DrawDebug 网格边界 |
 
@@ -288,17 +288,17 @@
 | 阶段 | 总任务 | 已完成 | 进度 |
 |------|--------|--------|------|
 | Phase 1: 基础架构 | 8 | 8 | 100% |
-| Phase 1.5: 动画系统 | 5 | 0 | 0% |
-| Phase 2: 碰撞通道 | 10 | 5 | 50% |
-| Phase 2.5: 层级关系 | 4 | 0 | 0% |
-| Phase 3: 空间检测 | 13 | 1 | 8% |
+| Phase 1.5: 动画系统 | 5 | 5 | 100% |
+| Phase 2: 碰撞通道 | 10 | 10 | 100% |
+| Phase 2.5: 层级关系 | 4 | 4 | 100% |
+| Phase 3: 空间检测 | 13 | 6 | 46% |
 | Phase 4: PBD 系统 | 16 | 1 | 6% |
 | Phase 5: RVO 系统 | 18 | 1 | 6% |
 | Phase 6: LOD 系统 | 6 | 0 | 0% |
 | Phase 7: 几何工具 | 14 | 0 | 0% |
 | Phase 8: 编辑器 | 7 | 0 | 0% |
 | Phase 9: 示例文档 | 7 | 0 | 0% |
-| **总计** | **108** | **16** | **15%** |
+| **总计** | **108** | **35** | **32%** |
 
 ---
 
@@ -323,6 +323,8 @@
 
 | 日期 | 更新内容 |
 |------|----------|
+| 2026-03-01 | 完成 Phase 3.1 空间网格核心功能：空间哈希网格结构、网格单元配置、实例映射、邻居查询、球形范围查询优化、掩码过滤 |
+| 2026-03-01 | 更新任务状态：Phase 1.5 动画系统、Phase 2.1 碰撞数据结构、Phase 2.5 层级关系均已完成 |
 | 2026-03-01 | 完成 Phase 1.1 所有任务：碰撞数据扩展、批量创建/销毁 API；完成 Phase 2.2 碰撞通道 API |
 | 2026-03-01 | 完成 Phase 1.1 速度数据扩展和 Phase 1.2 移动系统基础 API |
 | 2026-03-01 | 对比参考文档，补充遗漏任务：动画系统、层级关系、空间检测掩码过滤、几何工具细化 |

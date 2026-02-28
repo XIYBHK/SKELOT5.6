@@ -165,6 +165,25 @@ void USkelotWorldSubsystem::SkelotQueryLocationOverlappingSphere(const UObject* 
 		Singleton->QueryLocationOverlappingSphere(Center, Radius, Instances);
 }
 
+void USkelotWorldSubsystem::SkelotQueryLocationOverlappingSphereWithMask(const UObject* WorldContextObject, const FVector& Center, float Radius, uint8 CollisionMask, TArray<FSkelotInstanceHandle>& Instances)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+		Singleton->QueryLocationOverlappingSphereWithMask(Center, Radius, Instances, CollisionMask);
+}
+
+void USkelotWorldSubsystem::Skelot_SetSpatialGridCellSize(const UObject* WorldContextObject, float CellSize)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+		Singleton->SetSpatialGridCellSize(CellSize);
+}
+
+float USkelotWorldSubsystem::Skelot_GetSpatialGridCellSize(const UObject* WorldContextObject)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+		return Singleton->GetSpatialGridCellSize();
+	return 200.0f; // 默认值
+}
+
 void USkelotWorldSubsystem::Skelot_RemoveInvalidHandles(const UObject* WorldContextObject, bool bMaintainOrder, TArray<FSkelotInstanceHandle>& Handles)
 {
 	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))

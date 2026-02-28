@@ -990,15 +990,18 @@ void ASkelotWorld::Tick(float DeltaSeconds)
 	SKELOT_SCOPE_CYCLE_COUNTER(ASkelotWorld_Tick);
 
 	Super::Tick(DeltaSeconds);
-	
-#if UE_ENABLE_DEBUG_DRAWING	//draw phys bounds of instances 
+
+	// 重建空间网格（用于高效的空间查询）
+	RebuildSpatialGrid();
+
+#if UE_ENABLE_DEBUG_DRAWING	//draw phys bounds of instances
 	if(GSkelot_DrawPhyAsset)
 	{
 		for (int32 InstanceIndex = 0, NumDraw = 0; InstanceIndex < this->GetNumInstance() && NumDraw < 128; InstanceIndex++)
 		{
 			if (!IsInstanceAlive(InstanceIndex))
 				continue;
-			
+
 			NumDraw++;
 			this->DebugDrawCompactPhysicsAsset(InstanceIndex, FColor::MakeRandomSeededColor(InstanceIndex ^ SOA.Slots[InstanceIndex].Version));
 		}
@@ -2084,16 +2087,89 @@ void ASkelotWorld::Internal_CallOnAnimationNotify()
 
 void ASkelotWorld::QueryLocationOverlappingSphere(const FVector& Center, float Radius, TArray<FSkelotInstanceHandle>& Instances)
 {
-	for (int32 InstanceIndex = 0; InstanceIndex < GetNumInstance(); InstanceIndex++)
+	// 使用空间网格优化查询
+	if (bEnableSpatialGrid && SpatialGrid.GetNumCells() > 0)
 	{
-		if (IsInstanceAlive(InstanceIndex))
+		TArray<int32> Indices;
+		SpatialGrid.QuerySphere(Center, Radius, Indices, 0xFF, &SOA);
+		Instances.Reserve(Instances.Num() + Indices.Num());
+		for (int32 Idx : Indices)
 		{
-			auto DistSQ = (SOA.Locations[InstanceIndex] - Center).SizeSquared();
-			if (DistSQ < (Radius * Radius))
+			Instances.Add(IndexToHandle(Idx));
+		}
+	}
+	else
+	{
+		// 回退到简单遍历
+		for (int32 InstanceIndex = 0; InstanceIndex < GetNumInstance(); InstanceIndex++)
+		{
+			if (IsInstanceAlive(InstanceIndex))
 			{
-				Instances.Add(this->IndexToHandle(InstanceIndex));
+				auto DistSQ = (SOA.Locations[InstanceIndex] - Center).SizeSquared();
+				if (DistSQ < (Radius * Radius))
+				{
+					Instances.Add(this->IndexToHandle(InstanceIndex));
+				}
 			}
 		}
+	}
+}
+
+void ASkelotWorld::QueryLocationOverlappingSphereWithMask(const FVector& Center, float Radius, TArray<FSkelotInstanceHandle>& OutInstances, uint8 CollisionMask)
+{
+	// 使用空间网格优化查询
+	if (bEnableSpatialGrid && SpatialGrid.GetNumCells() > 0)
+	{
+		TArray<int32> Indices;
+		SpatialGrid.QuerySphere(Center, Radius, Indices, CollisionMask, &SOA);
+		OutInstances.Reserve(OutInstances.Num() + Indices.Num());
+		for (int32 Idx : Indices)
+		{
+			OutInstances.Add(IndexToHandle(Idx));
+		}
+	}
+	else
+	{
+		// 回退到简单遍历
+		for (int32 InstanceIndex = 0; InstanceIndex < GetNumInstance(); InstanceIndex++)
+		{
+			if (IsInstanceAlive(InstanceIndex))
+			{
+				// 掩码过滤
+				if (CollisionMask != 0xFF)
+				{
+					uint8 InstanceMask = SOA.CollisionMasks[InstanceIndex];
+					if ((InstanceMask & CollisionMask) == 0)
+					{
+						continue;
+					}
+				}
+
+				auto DistSQ = (SOA.Locations[InstanceIndex] - Center).SizeSquared();
+				if (DistSQ < (Radius * Radius))
+				{
+					OutInstances.Add(this->IndexToHandle(InstanceIndex));
+				}
+			}
+		}
+	}
+}
+
+void ASkelotWorld::SetSpatialGridCellSize(float CellSize)
+{
+	SpatialGrid.SetCellSize(CellSize);
+}
+
+float ASkelotWorld::GetSpatialGridCellSize() const
+{
+	return SpatialGrid.GetCellSize();
+}
+
+void ASkelotWorld::RebuildSpatialGrid()
+{
+	if (bEnableSpatialGrid)
+	{
+		SpatialGrid.Rebuild(SOA, GetNumInstance());
 	}
 }
 
@@ -2539,19 +2615,20 @@ ASkelotWorld* ASkelotWorld::Get(const UWorld* World, bool bCreateIfNotFound /*= 
 	return USkelotWorldSubsystem::Internal_GetSingleton(World, bCreateIfNotFound);
 }
 
-ASkelotWorld::ASkelotWorld(const FObjectInitializer& ObjectInitializer) : 
+ASkelotWorld::ASkelotWorld(const FObjectInitializer& ObjectInitializer) :
 	Super(ObjectInitializer),
-	HandleAllocator(true)
+	HandleAllocator(true),
+	bEnableSpatialGrid(true)
 {
 	PrimaryActorTick.bStartWithTickEnabled = PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.TickGroup = ETickingGroup::TG_PostUpdateWork;
-	
+
 #if WITH_EDITORONLY_DATA
 	this->bListedInSceneOutliner = false;
 #endif
-	
+
 	AnimationPlayRate = 1;
-	
+
 	if (!IsTemplate())
 	{
 		const USkelotDeveloperSettings* Settings = GetDefault<USkelotDeveloperSettings>();
