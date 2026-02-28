@@ -5,8 +5,7 @@
 
 #include "SkelotWorldBase.h"
 #include "SkelotSpatialGrid.h"
-
-
+#include "SkelotPBDCollision.h"
 
 #include "SkelotWorld.generated.h"
 
@@ -97,7 +96,21 @@ public:
 	// 4 = 分4帧更新（降低75%计算量，数据有最多3帧延迟）
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skelot|空间查询", meta = (DisplayName = "分帧更新步长", ClampMin = "1", ClampMax = "4"))
 	int32 SpatialGridFrameStride = 1;
-	
+
+	//////////////////////////////////////////////////////////////////////////
+	// PBD Collision System
+	// PBD碰撞系统 - 实例间的碰撞避让
+
+	// PBD碰撞系统实例
+	FSkelotPBDCollisionSystem PBDCollisionSystem;
+
+	// PBD配置参数
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skelot|PBD碰撞", meta = (DisplayName = "PBD配置"))
+	FSkelotPBDConfig PBDConfig;
+
+	// PBD更新帧计数器（用于UpdateFrequency）
+	int32 PBDUpdateFrameCounter = 0;
+
 	DECLARE_DELEGATE_ThreeParams(FOnWorldActorTick, ASkelotWorld*, ELevelTick, float);
 	//
 	FOnWorldActorTick OnWorldPreActorTick_End;
@@ -457,6 +470,52 @@ public:
 	 * 重建空间网格（内部使用，每帧自动调用）
 	 */
 	void RebuildSpatialGrid();
+
+	//////////////////////////////////////////////////////////////////////////
+	// PBD Collision API
+	// PBD碰撞系统 API
+
+	/**
+	 * 设置PBD配置参数
+	 * @param InConfig PBD配置结构体
+	 */
+	void SetPBDConfig(const FSkelotPBDConfig& InConfig);
+
+	/**
+	 * 获取PBD配置参数
+	 * @return PBD配置结构体
+	 */
+	const FSkelotPBDConfig& GetPBDConfig() const { return PBDConfig; }
+
+	/**
+	 * 启用或禁用PBD碰撞
+	 * @param bEnable true启用，false禁用
+	 */
+	void SetPBDEnabled(bool bEnable);
+
+	/**
+	 * 检查PBD碰撞是否启用
+	 * @return true启用，false禁用
+	 */
+	bool IsPBDEnabled() const { return PBDConfig.bEnablePBD; }
+
+	/**
+	 * 设置PBD碰撞半径
+	 * @param Radius 碰撞半径（厘米）
+	 */
+	void SetPBDCollisionRadius(float Radius);
+
+	/**
+	 * 获取PBD碰撞半径
+	 * @return 碰撞半径（厘米）
+	 */
+	float GetPBDCollisionRadius() const { return PBDConfig.CollisionRadius; }
+
+	/**
+	 * 执行PBD碰撞求解（内部使用，每帧自动调用）
+	 * @param DeltaTime 帧时间
+	 */
+	void SolvePBDCollisions(float DeltaTime);
 
 	void RemoveInvalidHandles(bool bMaintainOrder, TArray<FSkelotInstanceHandle>& InOutHandles);
 	//function to get handles of all the valid instances

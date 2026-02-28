@@ -184,6 +184,48 @@ float USkelotWorldSubsystem::Skelot_GetSpatialGridCellSize(const UObject* WorldC
 	return 200.0f; // 默认值
 }
 
+//////////////////////////////////////////////////////////////////////////
+// PBD Collision API Implementation
+
+void USkelotWorldSubsystem::Skelot_SetPBDConfig(const UObject* WorldContextObject, const FSkelotPBDConfig& Config)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+		Singleton->SetPBDConfig(Config);
+}
+
+FSkelotPBDConfig USkelotWorldSubsystem::Skelot_GetPBDConfig(const UObject* WorldContextObject)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+		return Singleton->GetPBDConfig();
+	return FSkelotPBDConfig::GetRecommendedConfig();
+}
+
+void USkelotWorldSubsystem::Skelot_SetPBDEnabled(const UObject* WorldContextObject, bool bEnable)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+		Singleton->SetPBDEnabled(bEnable);
+}
+
+bool USkelotWorldSubsystem::Skelot_IsPBDEnabled(const UObject* WorldContextObject)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+		return Singleton->IsPBDEnabled();
+	return false;
+}
+
+void USkelotWorldSubsystem::Skelot_SetPBDCollisionRadius(const UObject* WorldContextObject, float Radius)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+		Singleton->SetPBDCollisionRadius(Radius);
+}
+
+float USkelotWorldSubsystem::Skelot_GetPBDCollisionRadius(const UObject* WorldContextObject)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+		return Singleton->GetPBDCollisionRadius();
+	return 60.0f; // 默认值
+}
+
 void USkelotWorldSubsystem::Skelot_RemoveInvalidHandles(const UObject* WorldContextObject, bool bMaintainOrder, TArray<FSkelotInstanceHandle>& Handles)
 {
 	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))

@@ -994,6 +994,9 @@ void ASkelotWorld::Tick(float DeltaSeconds)
 	// 重建空间网格（用于高效的空间查询）
 	RebuildSpatialGrid();
 
+	// 执行PBD碰撞求解（用于实例间碰撞避让）
+	SolvePBDCollisions(DeltaSeconds);
+
 #if UE_ENABLE_DEBUG_DRAWING	//draw phys bounds of instances
 	if(GSkelot_DrawPhyAsset)
 	{
@@ -2172,6 +2175,61 @@ void ASkelotWorld::RebuildSpatialGrid()
 		// 使用分帧更新（来自预研文档的 FrameStride 方案）
 		SpatialGrid.RebuildIncremental(SOA, GetNumInstance());
 	}
+}
+
+//////////////////////////////////////////////////////////////////////////
+// PBD Collision API Implementation
+
+void ASkelotWorld::SetPBDConfig(const FSkelotPBDConfig& InConfig)
+{
+	PBDConfig = InConfig;
+	PBDCollisionSystem.SetConfig(PBDConfig);
+
+	// 根据PBD碰撞半径调整空间网格大小
+	if (bEnableSpatialGrid && PBDConfig.bEnablePBD)
+	{
+		float OptimalCellSize = PBDConfig.CollisionRadius * 2.0f * PBDConfig.GridCellSizeMultiplier;
+		SpatialGrid.SetCellSize(OptimalCellSize);
+	}
+}
+
+void ASkelotWorld::SetPBDEnabled(bool bEnable)
+{
+	PBDConfig.bEnablePBD = bEnable;
+	PBDCollisionSystem.SetConfig(PBDConfig);
+}
+
+void ASkelotWorld::SetPBDCollisionRadius(float Radius)
+{
+	PBDConfig.CollisionRadius = Radius;
+	PBDCollisionSystem.SetConfig(PBDConfig);
+
+	// 更新空间网格大小
+	if (bEnableSpatialGrid && PBDConfig.bEnablePBD)
+	{
+		float OptimalCellSize = PBDConfig.CollisionRadius * 2.0f * PBDConfig.GridCellSizeMultiplier;
+		SpatialGrid.SetCellSize(OptimalCellSize);
+	}
+}
+
+void ASkelotWorld::SolvePBDCollisions(float DeltaTime)
+{
+	// 检查是否启用PBD碰撞
+	if (!PBDConfig.bEnablePBD)
+	{
+		return;
+	}
+
+	// 检查更新频率
+	PBDUpdateFrameCounter++;
+	if (PBDUpdateFrameCounter < PBDConfig.UpdateFrequency)
+	{
+		return;
+	}
+	PBDUpdateFrameCounter = 0;
+
+	// 执行PBD碰撞求解
+	PBDCollisionSystem.SolveCollisions(SOA, GetNumInstance(), SpatialGrid, DeltaTime);
 }
 
 void ASkelotWorld::RemoveInvalidHandles(bool bMaintainOrder, TArray<FSkelotInstanceHandle>& InOutHandles)

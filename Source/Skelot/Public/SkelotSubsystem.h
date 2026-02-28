@@ -147,6 +147,58 @@ public:
 	static float Skelot_GetSpatialGridCellSize(const UObject* WorldContextObject);
 
 	//////////////////////////////////////////////////////////////////////////
+	// PBD Collision API
+	// PBD碰撞系统 API
+
+	/**
+	 * 设置PBD配置参数
+	 * @param WorldContextObject 世界上下文对象
+	 * @param Config PBD配置结构体
+	 */
+	UFUNCTION(BlueprintCallable, Category="Skelot|PBD碰撞", meta=(WorldContext="WorldContextObject", DisplayName = "设置PBD配置"))
+	static void Skelot_SetPBDConfig(const UObject* WorldContextObject, const FSkelotPBDConfig& Config);
+
+	/**
+	 * 获取PBD配置参数
+	 * @param WorldContextObject 世界上下文对象
+	 * @return PBD配置结构体
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Skelot|PBD碰撞", meta=(WorldContext="WorldContextObject", DisplayName = "获取PBD配置"))
+	static FSkelotPBDConfig Skelot_GetPBDConfig(const UObject* WorldContextObject);
+
+	/**
+	 * 启用或禁用PBD碰撞
+	 * @param WorldContextObject 世界上下文对象
+	 * @param bEnable true启用，false禁用
+	 */
+	UFUNCTION(BlueprintCallable, Category="Skelot|PBD碰撞", meta=(WorldContext="WorldContextObject", DisplayName = "设置PBD启用状态"))
+	static void Skelot_SetPBDEnabled(const UObject* WorldContextObject, bool bEnable);
+
+	/**
+	 * 检查PBD碰撞是否启用
+	 * @param WorldContextObject 世界上下文对象
+	 * @return true启用，false禁用
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Skelot|PBD碰撞", meta=(WorldContext="WorldContextObject", DisplayName = "是否启用PBD"))
+	static bool Skelot_IsPBDEnabled(const UObject* WorldContextObject);
+
+	/**
+	 * 设置PBD碰撞半径
+	 * @param WorldContextObject 世界上下文对象
+	 * @param Radius 碰撞半径（厘米）
+	 */
+	UFUNCTION(BlueprintCallable, Category="Skelot|PBD碰撞", meta=(WorldContext="WorldContextObject", DisplayName = "设置PBD碰撞半径"))
+	static void Skelot_SetPBDCollisionRadius(const UObject* WorldContextObject, float Radius);
+
+	/**
+	 * 获取PBD碰撞半径
+	 * @param WorldContextObject 世界上下文对象
+	 * @return 碰撞半径（厘米）
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Skelot|PBD碰撞", meta=(WorldContext="WorldContextObject", DisplayName = "获取PBD碰撞半径"))
+	static float Skelot_GetPBDCollisionRadius(const UObject* WorldContextObject);
+
+	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintCallable, Category="Skelot|工具", meta=(WorldContext="WorldContextObject", DisplayName = "移除无效句柄"))
 	static void Skelot_RemoveInvalidHandles(const UObject* WorldContextObject, bool bMaintainOrder, TArray<FSkelotInstanceHandle>& Handles);
 	//////////////////////////////////////////////////////////////////////////
