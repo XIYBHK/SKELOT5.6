@@ -42,6 +42,23 @@
 
 ---
 
+## 🎯 Phase 1.5: 动画系统扩展 (⚠️ 参考文档遗漏补充)
+
+### 1.5.1 动画播放参数
+| 任务 | 优先级 | 状态 | 说明 |
+|------|--------|------|------|
+| 定义 FSkelotAnimPlayParamsEx | P0 | ⬜ | Animation, bLoop, PlayRate, StartPosition, BlendInTime |
+| 扩展 InstancePlayAnimation | P0 | ⬜ | 支持新的参数结构体 |
+| 实现 BlendInTime 混合 | P1 | ⬜ | 动画过渡混合时间支持 |
+
+### 1.5.2 动画蓝图 API
+| 任务 | 优先级 | 状态 | 说明 |
+|------|--------|------|------|
+| Skelot_PlayAnimation | P0 | ⬜ | 蓝图封装，返回动画长度 |
+| Skelot_GetAnimCollection | P1 | ⬜ | 获取实例关联的动画集 |
+
+---
+
 ## 🎯 Phase 2: 碰撞通道系统
 
 ### 2.1 碰撞通道数据结构
@@ -62,6 +79,18 @@
 
 ---
 
+## 🎯 Phase 2.5: 层级关系 API (⚠️ 参考文档遗漏补充)
+
+### 2.5.1 层级操作 API
+| 任务 | 优先级 | 状态 | 说明 |
+|------|--------|------|------|
+| Skelot_AttachChild | P0 | ⬜ | 蓝图封装，支持 bKeepWorldTransform |
+| Skelot_DetachFromParent | P0 | ⬜ | 蓝图封装 |
+| Skelot_GetChildren | P1 | ⬜ | 新增：获取子实例数组 |
+| Skelot_GetParent | P1 | ⬜ | 新增：获取父实例句柄 |
+
+---
+
 ## 🎯 Phase 3: 空间检测系统
 
 ### 3.1 空间网格实现
@@ -77,6 +106,8 @@
 |------|--------|------|------|
 | QueryLocationOverlappingSphere | P0 | ⬜ | 球形范围查询，支持掩码过滤 |
 | QueryLocationOverlappingBox | P1 | ⬜ | 盒形范围查询 |
+| QuerySphere 掩码过滤 | P0 | ⬜ | CollisionMask 参数过滤结果 |
+| QueryBox 掩码过滤 | P1 | ⬜ | CollisionMask 参数过滤结果 |
 | 空间网格调试可视化 | P2 | ⬜ | DrawDebug 网格边界 |
 
 ### 3.3 技术调研
@@ -185,9 +216,9 @@
 ### 7.1 基础几何生成
 | 任务 | 优先级 | 状态 | 说明 |
 |------|--------|------|------|
-| GetBezierPoint | P1 | ⬜ | 贝塞尔曲线点 |
-| GetPointsByRound | P0 | ⬜ | 圆形区域点阵 |
-| GetPointsByGrid | P0 | ⬜ | 网格点阵 (1D/2D/3D) |
+| GetBezierPoint | P1 | ⬜ | 贝塞尔曲线点，支持任意阶控制点 |
+| GetPointsByRound | P0 | ⬜ | 圆形区域点阵，支持噪声随机偏移 |
+| GetPointsByGrid | P0 | ⬜ | 网格点阵 (1D/2D/3D)，完整参数支持 |
 
 ### 7.2 Shape 组件生成
 | 任务 | 优先级 | 状态 | 说明 |
@@ -198,7 +229,8 @@
 ### 7.3 Mesh 相关生成
 | 任务 | 优先级 | 状态 | 说明 |
 |------|--------|------|------|
-| GetPointsByMesh - 表面 | P2 | ⬜ | 静态网格表面随机点 |
+| GetPointsByMesh - 表面 | P2 | ⬜ | 静态网格表面随机点，支持 LODIndex |
+| 三角形面积加权采样 | P2 | ⬜ | 表面均匀分布算法 |
 | GetPointsByMeshVoxel - 外壳 | P2 | ⬜ | 体素化外壳 |
 | GetPointsByMeshVoxel - 实心 | P2 | ⬜ | 体素化实心 |
 
@@ -256,15 +288,17 @@
 | 阶段 | 总任务 | 已完成 | 进度 |
 |------|--------|--------|------|
 | Phase 1: 基础架构 | 8 | 0 | 0% |
+| Phase 1.5: 动画系统 | 5 | 0 | 0% |
 | Phase 2: 碰撞通道 | 10 | 0 | 0% |
-| Phase 3: 空间检测 | 11 | 1 | 9% |
+| Phase 2.5: 层级关系 | 4 | 0 | 0% |
+| Phase 3: 空间检测 | 13 | 1 | 8% |
 | Phase 4: PBD 系统 | 16 | 1 | 6% |
 | Phase 5: RVO 系统 | 18 | 1 | 6% |
 | Phase 6: LOD 系统 | 6 | 0 | 0% |
-| Phase 7: 几何工具 | 12 | 0 | 0% |
+| Phase 7: 几何工具 | 14 | 0 | 0% |
 | Phase 8: 编辑器 | 7 | 0 | 0% |
 | Phase 9: 示例文档 | 7 | 0 | 0% |
-| **总计** | **95** | **3** | **3%** |
+| **总计** | **108** | **3** | **3%** |
 
 ---
 
@@ -289,8 +323,9 @@
 
 | 日期 | 更新内容 |
 |------|----------|
+| 2026-03-01 | 对比参考文档，补充遗漏任务：动画系统、层级关系、空间检测掩码过滤、几何工具细化 |
 | 2026-02-28 | 创建任务列表，完成技术调研 |
 
 ---
 
-*最后更新: 2026-02-28*
+*最后更新: 2026-03-01*
