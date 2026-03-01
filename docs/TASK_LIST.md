@@ -216,15 +216,15 @@
 ### 7.1 基础几何生成
 | 任务 | 优先级 | 状态 | 说明 |
 |------|--------|------|------|
-| GetBezierPoint | P1 | ⬜ | 贝塞尔曲线点，支持任意阶控制点 |
-| GetPointsByRound | P0 | ⬜ | 圆形区域点阵，支持噪声随机偏移 |
-| GetPointsByGrid | P0 | ⬜ | 网格点阵 (1D/2D/3D)，完整参数支持 |
+| GetBezierPoint | P1 | ✅ | 贝塞尔曲线点，支持任意阶控制点 |
+| GetPointsByRound | P0 | ✅ | 圆形区域点阵，支持噪声随机偏移 |
+| GetPointsByGrid | P0 | ✅ | 网格点阵 (1D/2D/3D)，完整参数支持 |
 
 ### 7.2 Shape 组件生成
 | 任务 | 优先级 | 状态 | 说明 |
 |------|--------|------|------|
-| GetPointsByShape - 表面 | P1 | ⬜ | 球/盒/胶囊表面点 |
-| GetPointsByShape - 填充 | P1 | ⬜ | 球/盒/胶囊内部点 |
+| GetPointsByShape - 表面 | P1 | ✅ | 球/盒/胶囊表面点 |
+| GetPointsByShape - 填充 | P1 | ✅ | 球/盒/胶囊内部点 |
 
 ### 7.3 Mesh 相关生成
 | 任务 | 优先级 | 状态 | 说明 |
@@ -295,10 +295,10 @@
 | Phase 4: PBD 系统 | 16 | 11 | 69% |
 | Phase 5: RVO 系统 | 18 | 17 | 94% |
 | Phase 6: LOD 系统 | 6 | 6 | 100% |
-| Phase 7: 几何工具 | 14 | 0 | 0% |
+| Phase 7: 几何工具 | 14 | 5 | 36% |
 | Phase 8: 编辑器 | 7 | 0 | 0% |
 | Phase 9: 示例文档 | 7 | 0 | 0% |
-| **总计** | **108** | **67** | **62%** |
+| **总计** | **108** | **72** | **67%** |
 
 ---
 
@@ -323,6 +323,7 @@
 
 | 日期 | 更新内容 |
 |------|----------|
+| 2026-03-02 | 完成 Phase 7 几何工具库核心功能：GetPointsByRound(圆形点阵)、GetPointsByGrid(1D/2D/3D网格)、GetBezierPoint(贝塞尔曲线)、GetPointsByShape(球/盒/胶囊表面与填充)，创建 USkelotGeometryTools 蓝图函数库 |
 | 2026-03-01 | 完成 Phase 6 LOD 更新频率系统：距离计算、三级更新频率(近/中/远)、分帧更新、全部 LOD API（SetLODUpdateFrequencyEnabled/IsLODUpdateFrequencyEnabled/SetLODDistances）、FSkelotLODConfig 配置结构体 |
 | 2026-03-01 | 完成 Phase 5 RVO 避障系统核心功能：速度障碍(VO)、互惠避障(RVO)、ORCA线性规划求解、抗抖动系统(密度自适应/速度平滑/抖动检测抑制)、全部配置参数 |
 | 2026-03-01 | 完成 Phase 4.3 SkelotPBDPlane Actor：场景配置 Actor，支持 PBD/RVO/抗抖动参数配置，自动应用到 SkelotWorld，调试可视化功能 |
@@ -336,4 +337,4 @@
 
 ---
 
-*最后更新: 2026-03-01*
+*最后更新: 2026-03-02*

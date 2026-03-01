@@ -244,4 +244,47 @@ void RebuildIncremental(...)
 
 ---
 
+## 几何工具库实现 (2026-03-02)
+
+### 创建文件
+
+- `Source/Skelot/Public/SkelotGeometryTools.h` - 头文件
+- `Source/Skelot/Private/SkelotGeometryTools.cpp` - 实现文件
+
+### 实现的功能
+
+| 函数 | 说明 |
+|------|------|
+| `GetPointsByRound` | 圆形区域点阵，六边形紧密填充算法 |
+| `GetPointsByGrid` | 1D/2D/3D 网格点阵 |
+| `GetBezierPoint` | 贝塞尔曲线点，De Casteljau 算法 |
+| `GetPointsByShape` | 球/盒/胶囊组件表面与填充点阵 |
+
+### 算法要点
+
+1. **圆形填充**：使用六边形紧密填充（蜂窝排列）
+   - 水平间距 = Distance
+   - 垂直间距 = Distance * sqrt(3)/2
+   - 奇数行水平偏移一半间距
+
+2. **贝塞尔曲线**：使用 De Casteljau 算法
+   - 支持任意阶控制点
+   - 时间复杂度 O(n²)
+
+3. **Shape 组件**：
+   - 球体：球坐标采样（表面）+ 切片填充（内部）
+   - 盒体：6 面采样（表面）+ 网格填充（内部）
+   - 胶囊：圆柱+半球组合采样
+
+### 组件依赖
+
+```cpp
+#include "Components/ShapeComponent.h"
+#include "Components/SphereComponent.h"
+#include "Components/BoxComponent.h"
+#include "Components/CapsuleComponent.h"
+```
+
+---
+
 *最后更新: 2026-03-02*
