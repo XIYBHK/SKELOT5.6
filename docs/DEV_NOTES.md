@@ -294,110 +294,7 @@ void RebuildIncremental(...)
 - `Source/Skelot/Public/SkelotDebugTools.h` - 调试工具头文件
 - `Source/Skelot/Private/SkelotDebugTools.cpp` - 调试工具实现
 
-### 遇到的问题
-
-#### 1. FToolMenuSection::AddMenuEntry API 变更
-
-**问题**：UE 5.6 中 `AddMenuEntry` 的签名已变更，旧代码导致链接错误：
-```
-error LNK2019: 无法解析的外部符号 "FToolMenuSection::AddMenuEntry(...FUIAction...)"
-```
-
-**原因**：UE 5.6 要求使用 `FToolUIActionChoice` 而不是 `FUIAction`
-
-**解决方案**：
-```cpp
-// 错误（旧 API）
-Section.AddMenuEntry(
-    "CommandName",
-    LOCTEXT("Label", "Label"),
-    LOCTEXT("Tooltip", "Tooltip"),
-    FSlateIcon(),
-    FUIAction(FExecuteAction::CreateStatic(&MyFunction))
-);
-
-// 正确（UE 5.6）
-Section.AddMenuEntry(
-    "CommandName",
-    LOCTEXT("Label", "Label"),
-    LOCTEXT("Tooltip", "Tooltip"),
-    FSlateIcon(),
-    FToolUIActionChoice(FExecuteAction::CreateStatic(&MyFunction))
-);
-```
-
-**注意**：还需要在 Build.cs 中添加 `ToolMenus` 模块依赖：
-```csharp
-PublicDependencyModuleNames.AddRange(new string[] {
-    "ToolMenus",  // 添加这个
-    // ... 其他模块
-});
-```
-
-#### 2. TObjectIterator 在 Game 构建中不可用
-
-**问题**：`TObjectIterator` 在非 Editor 构建中编译失败：
-```
-error C7568: 假定的函数模板"TObjectIterator"调用缺少参数列表
-```
-
-**原因**：`TObjectIterator` 需要 `WITH_EDITOR` 宏保护，在 Shipping 构建中不可用
-
-**解决方案**：
-```cpp
-static void PrintStats()
-{
-#if WITH_EDITOR
-    // 使用 TObjectIterator 遍历对象
-    for (TObjectIterator<ASkelotWorld> It; It; ++It)
-    {
-        // ...
-    }
-#else
-    UE_LOG(LogTemp, Warning, TEXT("This command only works in Editor builds"));
-#endif
-}
-```
-
-#### 3. ASkelotWorld::Get 重载歧义
-
-**问题**：调用 `ASkelotWorld::Get(nullptr, false)` 时编译器报歧义错误
-
-**原因**：`Get` 有两个重载版本，`nullptr` 可以同时匹配 `const UObject*` 和 `const UWorld*`
-
-**解决方案**：使用 `TObjectIterator` 替代直接调用 `Get`
-
-### 控制台命令最佳实践
-
-#### 使用 FAutoConsoleCommand 自动注册
-
-```cpp
-// 声明静态控制台命令
-static FAutoConsoleCommand CmdDrawAllBounds(
-    TEXT("Skelot.DrawAllBounds"),
-    TEXT("Toggle drawing of all instance bounding boxes"),
-    FConsoleCommandDelegate::CreateStatic(&ToggleDrawAllBounds)
-);
-```
-
-**优点**：
-- 自动注册/注销
-- 不需要手动管理生命周期
-- 代码简洁
-
-#### 使用 FAutoConsoleVariableRef 自动同步变量
-
-```cpp
-static int32 GSkelot_DebugMode = 0;
-
-static FAutoConsoleVariableRef CVarDebugMode(
-    TEXT("Skelot.DebugMode"),
-    GSkelot_DebugMode,
-    TEXT("Debug draw mode bitmask")
-);
-```
-
-### 实现的调试命令
+### 实现的功能
 
 | 命令 | 功能 |
 |------|------|
@@ -410,135 +307,32 @@ static FAutoConsoleVariableRef CVarDebugMode(
 | `Skelot.DebugMode [0-255]` | 设置调试模式 |
 | `Skelot.DebugDrawDistance [距离]` | 设置绘制距离 |
 
----
+### 遇到的问题
 
-## 调试工具系统实现 (2026-03-02)
+> **详细解决方案请参考**: [UE_VERSION_COMPATIBILITY.md](./UE_VERSION_COMPATIBILITY.md)
 
-### 创建文件
+1. **FToolMenuSection::AddMenuEntry API 变更** - UE 5.6 要求使用 `FToolUIActionChoice`
+2. **TObjectIterator 在 Game 构建中不可用** - 需要使用 `#if WITH_EDITOR` 包裹
+3. **ASkelotWorld::Get 重载歧义** - `nullptr` 参数导致编译器无法选择重载版本
 
-- `Source/Skelot/Public/SkelotDebugTools.h` - 贴试头文件
-- `Source/Skelot/Private/SkelotDebugTools.cpp` - 实现文件
+### 控制台命令最佳实践
 
-### 实现的调试命令
-
-| 命令 | 功能 |
-|------|------|
-| `Skelot.DrawAllBounds` | 绘制所有实例包围盒 |
-| `Skelot.DrawSpatialGrid` | 绘制空间网格 |
-| `Skelot.DrawCollisionRadius` | 绘制碰撞半径 |
-| `Skelot.DrawVelocities` | 绘制速度向量 |
-| `Skelot.DrawNeighborLinks` | 绘制邻居连接线 |
-| `Skelot.Stats` | 打印统计信息到| `Skelot.DebugMode [0-255]` | 设置调试模式 |
-| `Skelot.DebugDrawDistance [距离]` | 设置绘制距离 |
-
-### 遇到的问题及#### 1. FToolMenuSection::AddMenuEntry API 变更
-
-**问题**：UE 5.6 中 `AddMenuEntry` 的签名卡已变更，旧代码导致链接错误 `LNK2019`。
-
-**旧签名（UE 5.5 及更早）**：
 ```cpp
-Section.AddMenuEntry(
-    FName,
-    FText Label,
-    FText ToolTip,
-    FSlateIcon,
-    FUIAction  // 旧版本
-);
-```
-
-**新签名（UE 5.6）**：
-```cpp
-Section.AddMenuEntry(
-    FName,
-    TAttribute<FText> Label,
-    TAttribute<FText> ToolTip,
-    TAttribute<FSlateIcon> Icon,
-    FToolUIActionChoice Action,  // 新版本
-    EUserInterfaceActionType Type,
-    FName TutorialHighlight
-);
-```
-
-**解决方案**：
-```cpp
-FToolMenuEntry& Entry = Section.AddMenuEntry(
-    "CommandName",
-    LOCTEXT("Label", "Label"),
-    LOCTEXT("ToolTip", "ToolTip"),
-    FSlateIcon(),
-    FToolUIActionChoice(FExecuteAction::CreateSP(this,    &MyClass::ExecuteCommand))
-);
-```
-
-**依赖更新**：需要在 `SkelotEd.Build.cs` 中添加 `ToolMenus` 模块依赖：
-```cs
-PublicDependencyModuleNames.AddRange(
-    new string[]
-    {
-        // ... 其他模块 ...
-        "ToolMenus"  // 添加此模块
-    }
-);
-```
-
-#### 2. TObjectIterator 在 Game 构建中不可用
-
-**问题**：在非 Editor 构建中，`TObjectIterator` 不可用，导致编译错误 `C7568`。
-
-**解决方案**：使用 `#if WITH_EDITOR` 完包裹相关代码：
-```cpp
-static void PrintStats()
-{
-#if WITH_EDITOR
-    // 使用 TObjectIterator 的代码
-    for (TObjectIterator<ASkelotWorld> It; It; ++It)
-    {
-        // ...
-    }
-#else
-    UE_LOG(LogTemp, Warning, TEXT("Stats command only available in Editor builds"));
-#endif
-}
-```
-
-#### 3. 控制台命令注册方式
-
-**最佳实践**：使用 `FAutoConsoleCommand` 静态注册
-```cpp
-// 方式1：静态函数
-static FAutoConsoleCommand CmdDrawBounds(
+// 使用 FAutoConsoleCommand 自动注册
+static FAutoConsoleCommand CmdDrawAllBounds(
     TEXT("Skelot.DrawAllBounds"),
-    TEXT("Description"),
-    FConsoleCommandDelegate::CreateStatic(&ToggleDrawBounds)
+    TEXT("Toggle drawing of all instance bounding boxes"),
+    FConsoleCommandDelegate::CreateStatic(&ToggleDrawAllBounds)
 );
 
-// 方式2：使用 CVar 和命令组合
+// 使用 FAutoConsoleVariableRef 自动同步变量
 static int32 GSkelot_DebugMode = 0;
 static FAutoConsoleVariableRef CVarDebugMode(
     TEXT("Skelot.DebugMode"),
     GSkelot_DebugMode,
-    TEXT("Description")
+    TEXT("Debug draw mode bitmask")
 );
 ```
-
-**优点**：
-- 自动注册/注销
-- 不需要手动管理生命周期
-- 线程安全
-
-### 经验总结
-
-1. **UE 5.6 API 变更**：许多 Slate/ToolMenus API 在 UE 5.6 中有签名变更，   - 使用 `FToolUIActionChoice` 替代 `FUIAction`
-   - 添加 `ToolMenus` 模块依赖
-
-2. **Editor-only 代码**：
-   - 使用 `#if WITH_EDITOR` 耶囲相关功能
-   - Game 构建会某些迭代器不可用
-
-3. **调试工具设计**：
-   - 使用位掩码控制多种调试模式
-   - 距离裁剪避免性能问题
-   - 限制绘制数量防止卡顿
 
 ---
 
