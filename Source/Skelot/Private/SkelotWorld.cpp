@@ -4,6 +4,7 @@
 #include "SkelotClusterComponent.h"
 #include "SkelotSubsystem.h"
 #include "SkelotPrivate.h"
+#include "SkelotRVOSystem.h"
 #include "SkelotAnimCollection.h"
 #include "SkelotPrivateUtils.h"
 #include "Rendering/SkeletalMeshRenderData.h"
@@ -2232,6 +2233,35 @@ void ASkelotWorld::SolvePBDCollisions(float DeltaTime)
 	PBDCollisionSystem.SolveCollisions(SOA, GetNumInstance(), SpatialGrid, DeltaTime);
 }
 
+void ASkelotWorld::SetRVOConfig(const FSkelotRVOConfig& InConfig)
+{
+	RVOConfig = InConfig;
+	RVOSystem.SetConfig(RVOConfig);
+}
+
+void ASkelotWorld::SetAntiJitterConfig(const FSkelotAntiJitterConfig& InConfig)
+{
+	AntiJitterConfig = InConfig;
+	RVOSystem.SetAntiJitterConfig(AntiJitterConfig);
+}
+
+void ASkelotWorld::SetRVOEnabled(bool bEnable)
+{
+	RVOConfig.bEnableRVO = bEnable;
+	RVOSystem.SetConfig(RVOConfig);
+}
+
+void ASkelotWorld::ComputeRVOAvoidance(float DeltaTime)
+{
+	// 检查是否启用 RVO 避障
+	if (!RVOConfig.bEnableRVO)
+	{
+		return;
+	}
+
+	// 执行 RVO 避障计算
+	RVOSystem.ComputeAvoidance(SOA, GetNumInstance(), SpatialGrid, DeltaTime, PBDConfig.CollisionRadius);
+}
 void ASkelotWorld::RemoveInvalidHandles(bool bMaintainOrder, TArray<FSkelotInstanceHandle>& InOutHandles)
 {
 	if (bMaintainOrder)

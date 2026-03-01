@@ -39,14 +39,15 @@ void ASkelotPBDPlane::ApplyConfigToWorld()
 	// 应用 PBD 配置
 	SkelotWorld->SetPBDConfig(PBDConfig);
 
-	// TODO: 应用 RVO 配置（RVO 系统尚未实现）
-	// SkelotWorld->SetRVOConfig(RVOConfig);
+	// 应用 RVO 配置
+	SkelotWorld->SetRVOConfig(RVOConfig);
 
-	// TODO: 应用抗抖动配置（抗抖动系统尚未实现）
-	// SkelotWorld->SetAntiJitterConfig(AntiJitterConfig);
+	// 应用抗抖动配置
+	SkelotWorld->SetAntiJitterConfig(AntiJitterConfig);
 
-	UE_LOG(LogTemp, Log, TEXT("ASkelotPBDPlane - Applied config to SkelotWorld: PBD=%s, Radius=%.1f, Iterations=%d"),
+	UE_LOG(LogTemp, Log, TEXT("ASkelotPBDPlane - Applied config to SkelotWorld: PBD=%s, RVO=%s, Radius=%.1f, Iterations=%d"),
 		PBDConfig.bEnablePBD ? TEXT("Enabled") : TEXT("Disabled"),
+		RVOConfig.bEnableRVO ? TEXT("Enabled") : TEXT("Disabled"),
 		PBDConfig.CollisionRadius,
 		PBDConfig.IterationCount);
 }

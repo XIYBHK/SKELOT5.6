@@ -6,7 +6,7 @@
 #include "SkelotWorldBase.h"
 #include "SkelotSpatialGrid.h"
 #include "SkelotPBDCollision.h"
-
+#include "SkelotRVOSystem.h"
 #include "SkelotWorld.generated.h"
 
 enum class ESkelotClusterMode : uint8;
@@ -108,10 +108,25 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skelot|PBD碰撞", meta = (DisplayName = "PBD配置"))
 	FSkelotPBDConfig PBDConfig;
 
-	// PBD更新帧计数器（用于UpdateFrequency）
-	int32 PBDUpdateFrameCounter = 0;
+        // PBD更新帧计数器（用于UpdateFrequency）
+        int32 PBDUpdateFrameCounter = 0;
 
-	DECLARE_DELEGATE_ThreeParams(FOnWorldActorTick, ASkelotWorld*, ELevelTick, float);
+        //////////////////////////////////////////////////////////////////////////
+        // RVO/ORCA Avoidance System
+        // RVO/ORCA 避障系统 - 实例间的智能避障
+
+        // RVO 避障系统实例
+        FSkelotRVOSystem RVOSystem;
+
+        // RVO 配置参数
+        UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skelot|RVO避障", meta = (DisplayName = "RVO配置"))
+        FSkelotRVOConfig RVOConfig;
+
+        // 抗抖动配置参数
+        UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skelot|RVO避障", meta = (DisplayName = "抗抖动配置"))
+        FSkelotAntiJitterConfig AntiJitterConfig;
+
+        DECLARE_DELEGATE_ThreeParams(FOnWorldActorTick, ASkelotWorld*, ELevelTick, float);
 	//
 	FOnWorldActorTick OnWorldPreActorTick_End;
 
@@ -516,6 +531,52 @@ public:
 	 * @param DeltaTime 帧时间
 	 */
 	void SolvePBDCollisions(float DeltaTime);
+
+	//////////////////////////////////////////////////////////////////////////
+	// RVO/ORCA Avoidance API
+	// RVO 避障系统 API
+
+	/**
+	 * 设置 RVO 配置参数
+	 * @param InConfig RVO 配置结构体
+	 */
+	void SetRVOConfig(const FSkelotRVOConfig& InConfig);
+
+	/**
+	 * 获取 RVO 配置参数
+	 * @return RVO 配置结构体
+	 */
+	const FSkelotRVOConfig& GetRVOConfig() const { return RVOConfig; }
+
+	/**
+	 * 设置抗抖动配置参数
+	 * @param InConfig 抗抖动配置结构体
+	 */
+	void SetAntiJitterConfig(const FSkelotAntiJitterConfig& InConfig);
+
+	/**
+	 * 获取抗抖动配置参数
+	 * @return 抗抖动配置结构体
+	 */
+	const FSkelotAntiJitterConfig& GetAntiJitterConfig() const { return AntiJitterConfig; }
+
+	/**
+	 * 启用或禁用 RVO 避障
+	 * @param bEnable true 启用，false 禁用
+	 */
+	void SetRVOEnabled(bool bEnable);
+
+	/**
+	 * 检查 RVO 避障是否启用
+	 * @return true 启用，false 禁用
+	 */
+	bool IsRVOEnabled() const { return RVOConfig.bEnableRVO; }
+
+	/**
+	 * 执行 RVO 避障计算（内部使用，每帧自动调用）
+	 * @param DeltaTime 帧时间
+	 */
+	void ComputeRVOAvoidance(float DeltaTime);
 
 	void RemoveInvalidHandles(bool bMaintainOrder, TArray<FSkelotInstanceHandle>& InOutHandles);
 	//function to get handles of all the valid instances
