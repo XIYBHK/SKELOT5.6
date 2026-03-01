@@ -53,6 +53,7 @@
 #include "Animation/AnimSequenceBase.h"
 
 #include "SkelotPrimitiveProxy.h"
+#include "SkelotDebugTools.h"
 
 class FSkelotClusterProxy;
 
@@ -1034,7 +1035,10 @@ void ASkelotWorld::Tick(float DeltaSeconds)
 	}
 #endif
 
-
+	// 调用调试工具进行可视化绘制
+#if !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
+	FSkelotDebugTools::Get().Tick(this, DeltaSeconds);
+#endif
 }
 
 void ASkelotWorld::BeginDestroy()

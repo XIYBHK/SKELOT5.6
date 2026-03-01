@@ -49,28 +49,29 @@ void FSkelotAssetTypeActions_SkeletalMesh::GetActions(const TArray<UObject*>& In
 
 	if (AssetPaths.Num() > 0)
 	{
-		Section.AddMenuEntry(
+		// 使用 FToolMenuEntry 创建菜单项
+		FToolMenuEntry& EntryAnimCollection = Section.AddMenuEntry(
 			"Skelot_CreateAnimCollection",
 			LOCTEXT("Skelot_CreateAnimCollection", "创建 Skelot 动画集合"),
 			LOCTEXT("Skelot_CreateAnimCollection_ToolTip", "从骨骼网格体创建 Skelot 动画集合资产"),
 			FSlateIcon(),
-			FUIAction(FExecuteAction::CreateSP(this, &FSkelotAssetTypeActions_SkeletalMesh::ExecuteCreateAnimCollection, AssetPaths))
+			FToolUIActionChoice(FExecuteAction::CreateSP(this, &FSkelotAssetTypeActions_SkeletalMesh::ExecuteCreateAnimCollection, AssetPaths))
 		);
 
-		Section.AddMenuEntry(
+		FToolMenuEntry& EntryRenderParams = Section.AddMenuEntry(
 			"Skelot_CreateRenderParams",
 			LOCTEXT("Skelot_CreateRenderParams", "创建 Skelot 渲染参数"),
 			LOCTEXT("Skelot_CreateRenderParams_ToolTip", "从骨骼网格体创建 Skelot 渲染参数资产"),
 			FSlateIcon(),
-			FUIAction(FExecuteAction::CreateSP(this, &FSkelotAssetTypeActions_SkeletalMesh::ExecuteCreateRenderParams, AssetPaths))
+			FToolUIActionChoice(FExecuteAction::CreateSP(this, &FSkelotAssetTypeActions_SkeletalMesh::ExecuteCreateRenderParams, AssetPaths))
 		);
 
-		Section.AddMenuEntry(
+		FToolMenuEntry& EntryAllAssets = Section.AddMenuEntry(
 			"Skelot_CreateAllAssets",
 			LOCTEXT("Skelot_CreateAllAssets", "创建所有 Skelot 资产"),
 			LOCTEXT("Skelot_CreateAllAssets_ToolTip", "从骨骼网格体同时创建动画集合和渲染参数资产"),
 			FSlateIcon(),
-			FUIAction(FExecuteAction::CreateSP(this, &FSkelotAssetTypeActions_SkeletalMesh::ExecuteCreateAllAssets, AssetPaths))
+			FToolUIActionChoice(FExecuteAction::CreateSP(this, &FSkelotAssetTypeActions_SkeletalMesh::ExecuteCreateAllAssets, AssetPaths))
 		);
 	}
 }

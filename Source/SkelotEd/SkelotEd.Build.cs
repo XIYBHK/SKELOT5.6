@@ -27,7 +27,7 @@ public class SkelotEd : ModuleRules
 			new string[]
 			{
 				"Skelot",
-				"Core", "RHI", "RenderCore", "Engine", "UnrealEd", "Blutility", "AssetRegistry", "AssetTools", "Slate", "SlateCore", "EditorStyle", "PropertyEditor", "InputCore"
+				"Core", "RHI", "RenderCore", "Engine", "UnrealEd", "Blutility", "AssetRegistry", "AssetTools", "Slate", "SlateCore", "EditorStyle", "PropertyEditor", "InputCore", "ToolMenus"
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);
