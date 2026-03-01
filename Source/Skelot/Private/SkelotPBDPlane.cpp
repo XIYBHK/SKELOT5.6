@@ -14,6 +14,7 @@ ASkelotPBDPlane::ASkelotPBDPlane()
 	PBDConfig = FSkelotPBDConfig::GetRecommendedConfig();
 	RVOConfig = FSkelotRVOConfig::GetRecommendedConfig();
 	AntiJitterConfig = FSkelotAntiJitterConfig::GetRecommendedConfig();
+	LODConfig = FSkelotLODConfig::GetRecommendedConfig();
 }
 
 void ASkelotPBDPlane::BeginPlay()
@@ -45,9 +46,13 @@ void ASkelotPBDPlane::ApplyConfigToWorld()
 	// 应用抗抖动配置
 	SkelotWorld->SetAntiJitterConfig(AntiJitterConfig);
 
-	UE_LOG(LogTemp, Log, TEXT("ASkelotPBDPlane - Applied config to SkelotWorld: PBD=%s, RVO=%s, Radius=%.1f, Iterations=%d"),
+	// 应用 LOD 配置
+	SkelotWorld->SetLODConfig(LODConfig);
+
+	UE_LOG(LogTemp, Log, TEXT("ASkelotPBDPlane - Applied config to SkelotWorld: PBD=%s, RVO=%s, LOD=%s, Radius=%.1f, Iterations=%d"),
 		PBDConfig.bEnablePBD ? TEXT("Enabled") : TEXT("Disabled"),
 		RVOConfig.bEnableRVO ? TEXT("Enabled") : TEXT("Disabled"),
+		LODConfig.bEnableLODUpdateFrequency ? TEXT("Enabled") : TEXT("Disabled"),
 		PBDConfig.CollisionRadius,
 		PBDConfig.IterationCount);
 }
@@ -57,6 +62,7 @@ void ASkelotPBDPlane::LoadRecommendedConfig()
 	PBDConfig = FSkelotPBDConfig::GetRecommendedConfig();
 	RVOConfig = FSkelotRVOConfig::GetRecommendedConfig();
 	AntiJitterConfig = FSkelotAntiJitterConfig::GetRecommendedConfig();
+	LODConfig = FSkelotLODConfig::GetRecommendedConfig();
 }
 
 ASkelotWorld* ASkelotPBDPlane::GetSkelotWorld() const

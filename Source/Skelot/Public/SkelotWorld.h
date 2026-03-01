@@ -126,6 +126,20 @@ public:
         UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skelot|RVO避障", meta = (DisplayName = "抗抖动配置"))
         FSkelotAntiJitterConfig AntiJitterConfig;
 
+        //////////////////////////////////////////////////////////////////////////
+        // LOD Update Frequency System
+        // LOD 更新频率系统 - 基于距离的更新频率优化
+
+        // LOD 配置参数
+        UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skelot|LOD更新", meta = (DisplayName = "LOD配置"))
+        FSkelotLODConfig LODConfig;
+
+        // LOD 更新帧计数器
+        int32 LODUpdateFrameCounter = 0;
+
+        // 相机位置缓存（用于 LOD 距离计算）
+        FVector CachedCameraLocation = FVector::ZeroVector;
+
         DECLARE_DELEGATE_ThreeParams(FOnWorldActorTick, ASkelotWorld*, ELevelTick, float);
 	//
 	FOnWorldActorTick OnWorldPreActorTick_End;
@@ -577,6 +591,70 @@ public:
 	 * @param DeltaTime 帧时间
 	 */
 	void ComputeRVOAvoidance(float DeltaTime);
+
+	//////////////////////////////////////////////////////////////////////////
+	// LOD Update Frequency API
+	// LOD 更新频率 API - 基于距离的更新频率优化
+
+	/**
+	 * 启用或禁用 LOD 更新频率优化
+	 * @param bEnable true 启用，false 禁用（所有实例每帧更新）
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Skelot|LOD", meta = (DisplayName = "Set LOD Update Frequency Enabled"))
+	void SetLODUpdateFrequencyEnabled(bool bEnable);
+
+	/**
+	 * 检查 LOD 更新频率是否已启用
+	 * @return true 已启用，false 已禁用
+	 */
+	UFUNCTION(BlueprintPure, Category = "Skelot|LOD", meta = (DisplayName = "Is LOD Update Frequency Enabled"))
+	bool IsLODUpdateFrequencyEnabled() const { return LODConfig.bEnableLODUpdateFrequency; }
+
+	/**
+	 * 设置 LOD 距离阈值
+	 * @param MediumDist 中距离阈值（厘米），超过后每2帧更新
+	 * @param FarDist 远距离阈值（厘米），超过后每4帧更新
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Skelot|LOD", meta = (DisplayName = "Set LOD Distances"))
+	void SetLODDistances(float MediumDist, float FarDist);
+
+	/**
+	 * 获取 LOD 距离阈值
+	 * @param OutMediumDist 输出中距离阈值
+	 * @param OutFarDist 输出远距离阈值
+	 */
+	UFUNCTION(BlueprintPure, Category = "Skelot|LOD", meta = (DisplayName = "Get LOD Distances"))
+	void GetLODDistances(float& OutMediumDist, float& OutFarDist) const
+	{
+		OutMediumDist = LODConfig.MediumDistance;
+		OutFarDist = LODConfig.FarDistance;
+	}
+
+	/**
+	 * 设置 LOD 配置参数
+	 * @param InConfig LOD 配置结构体
+	 */
+	void SetLODConfig(const FSkelotLODConfig& InConfig);
+
+	/**
+	 * 获取 LOD 配置参数
+	 * @return LOD 配置结构体
+	 */
+	const FSkelotLODConfig& GetLODConfig() const { return LODConfig; }
+
+	/**
+	 * 检查实例是否应该在本帧更新（基于 LOD 距离）
+	 * @param InstanceIndex 实例索引
+	 * @return true 应该更新，false 跳过本帧
+	 */
+	bool ShouldUpdateInstanceLOD(int32 InstanceIndex) const;
+
+	/**
+	 * 获取实例的 LOD 更新频率级别
+	 * @param InstanceIndex 实例索引
+	 * @return 0=近（每帧）, 1=中（每2帧）, 2=远（每4帧）
+	 */
+	int32 GetInstanceLODLevel(int32 InstanceIndex) const;
 
 	void RemoveInvalidHandles(bool bMaintainOrder, TArray<FSkelotInstanceHandle>& InOutHandles);
 	//function to get handles of all the valid instances

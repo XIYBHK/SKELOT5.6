@@ -137,6 +137,43 @@ struct FSkelotAntiJitterConfig
 };
 
 /**
+ * LOD 更新频率系统配置参数
+ *
+ * 基于实例到相机的距离，动态调整更新频率
+ * 远距离实例使用更低的更新频率，提升性能
+ */
+USTRUCT(BlueprintType)
+struct FSkelotLODConfig
+{
+	GENERATED_BODY()
+
+	/** 是否启用 LOD 更新频率优化 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LOD")
+	bool bEnableLODUpdateFrequency = false;
+
+	/** 中距离阈值（厘米）- 超过后每2帧更新 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LOD", meta = (ClampMin = "100", ClampMax = "10000"))
+	float MediumDistance = 2000.0f;
+
+	/** 远距离阈值（厘米）- 超过后每4帧更新 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LOD", meta = (ClampMin = "100", ClampMax = "20000"))
+	float FarDistance = 5000.0f;
+
+	/** 默认构造 */
+	FSkelotLODConfig() = default;
+
+	/** 获取推荐的默认配置 */
+	static FSkelotLODConfig GetRecommendedConfig()
+	{
+		FSkelotLODConfig Config;
+		Config.bEnableLODUpdateFrequency = false;
+		Config.MediumDistance = 2000.0f;
+		Config.FarDistance = 5000.0f;
+		return Config;
+	}
+};
+
+/**
  * Skelot PBD Plane Actor
  *
  * 场景配置 Actor，用于配置 PBD 碰撞和 RVO 避障参数。
@@ -173,6 +210,10 @@ public:
 	/** 抗抖动配置 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "抗抖动", meta = (DisplayName = "抗抖动配置"))
 	FSkelotAntiJitterConfig AntiJitterConfig;
+
+	/** LOD更新频率配置 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LOD更新", meta = (DisplayName = "LOD配置"))
+	FSkelotLODConfig LODConfig;
 
 	/** 是否在运行时自动应用配置到 SkelotWorld */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "配置", meta = (DisplayName = "自动应用配置"))

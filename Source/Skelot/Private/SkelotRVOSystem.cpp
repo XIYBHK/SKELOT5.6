@@ -130,7 +130,8 @@ bool FSkelotRVOSystem::ComputeAgentAvoidance(const FSkelotInstancesSOA& SOA, int
 	const FVector3d& MyPos3D = SOA.Locations[InstanceIndex];
 	const FVector3f& MyVel3D = SOA.Velocities[InstanceIndex];
 
-	// 转换为 3D（XY 平面，	FVector3f MyPos(MyPos3D.X, MyPos3D.Y, 0.0f);
+	// 转换为 3D（XY 平面）
+	FVector3f MyPos(MyPos3D.X, MyPos3D.Y, 0.0f);
 	FVector3f MyVel(MyVel3D.X, MyVel3D.Y, 0.0f);
 
 	// 获取当前速度大小
@@ -143,7 +144,7 @@ bool FSkelotRVOSystem::ComputeAgentAvoidance(const FSkelotInstancesSOA& SOA, int
 	}
 
 	// 计算期望速度（保持当前方向）
-	FVector2f PreferredVelocity = MyVel;
+	FVector2f PreferredVelocity(MyVel.X, MyVel.Y);
 
 	// 计算最大速度
 	float MaxSpeed = Config.MaxSpeed > 0 ? Config.MaxSpeed : CurrentSpeed;
@@ -200,7 +201,7 @@ bool FSkelotRVOSystem::ComputeAgentAvoidance(const FSkelotInstancesSOA& SOA, int
 	}
 
 	// 使用线性规划求解最优速度
-	FVector3f NewVelocity2D;
+	FVector2f NewVelocity2D;
 	bool bFoundSolution = LinearProgram(ORCAPlanes, PreferredVelocity, MaxSpeed, NewVelocity2D);
 
 	if (!bFoundSolution)

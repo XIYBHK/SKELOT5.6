@@ -992,6 +992,28 @@ void ASkelotWorld::Tick(float DeltaSeconds)
 
 	Super::Tick(DeltaSeconds);
 
+	// 更新 LOD 帧计数器和相机位置缓存
+	if (LODConfig.bEnableLODUpdateFrequency)
+	{
+		LODUpdateFrameCounter++;
+
+		// 获取主相机位置
+		if (UWorld* World = GetWorld())
+		{
+			if (APlayerController* PC = World->GetFirstPlayerController())
+			{
+				if (AActor* ViewTarget = PC->GetViewTarget())
+				{
+					CachedCameraLocation = ViewTarget->GetActorLocation();
+				}
+				else if (PC->PlayerCameraManager)
+				{
+					CachedCameraLocation = PC->PlayerCameraManager->GetCameraLocation();
+				}
+			}
+		}
+	}
+
 	// 重建空间网格（用于高效的空间查询）
 	RebuildSpatialGrid();
 
@@ -2262,6 +2284,84 @@ void ASkelotWorld::ComputeRVOAvoidance(float DeltaTime)
 	// 执行 RVO 避障计算
 	RVOSystem.ComputeAvoidance(SOA, GetNumInstance(), SpatialGrid, DeltaTime, PBDConfig.CollisionRadius);
 }
+
+//////////////////////////////////////////////////////////////////////////
+// LOD Update Frequency System Implementation
+
+void ASkelotWorld::SetLODUpdateFrequencyEnabled(bool bEnable)
+{
+	LODConfig.bEnableLODUpdateFrequency = bEnable;
+}
+
+void ASkelotWorld::SetLODDistances(float MediumDist, float FarDist)
+{
+	LODConfig.MediumDistance = FMath::Max(100.0f, MediumDist);
+	LODConfig.FarDistance = FMath::Max(LODConfig.MediumDistance + 100.0f, FarDist);
+}
+
+void ASkelotWorld::SetLODConfig(const FSkelotLODConfig& InConfig)
+{
+	LODConfig = InConfig;
+	// 确保距离值有效
+	LODConfig.MediumDistance = FMath::Max(100.0f, LODConfig.MediumDistance);
+	LODConfig.FarDistance = FMath::Max(LODConfig.MediumDistance + 100.0f, LODConfig.FarDistance);
+}
+
+bool ASkelotWorld::ShouldUpdateInstanceLOD(int32 InstanceIndex) const
+{
+	// 如果未启用 LOD 更新频率优化，始终更新
+	if (!LODConfig.bEnableLODUpdateFrequency)
+	{
+		return true;
+	}
+
+	// 获取实例的 LOD 级别
+	int32 LODLevel = GetInstanceLODLevel(InstanceIndex);
+
+	// 根据 LOD 级别决定更新频率
+	switch (LODLevel)
+	{
+	case 0: // 近距离 - 每帧更新
+		return true;
+	case 1: // 中距离 - 每2帧更新
+		return (LODUpdateFrameCounter % 2) == 0;
+	case 2: // 远距离 - 每4帧更新
+		return (LODUpdateFrameCounter % 4) == 0;
+	default:
+		return true;
+	}
+}
+
+int32 ASkelotWorld::GetInstanceLODLevel(int32 InstanceIndex) const
+{
+	// 获取实例位置
+	if (!SOA.Locations.IsValidIndex(InstanceIndex) || SOA.Slots[InstanceIndex].bDestroyed)
+	{
+		return 0; // 默认近距离
+	}
+
+	const FVector& InstanceLocation = SOA.Locations[InstanceIndex];
+
+	// 计算到相机的距离
+	float DistanceToCamera = FVector::DistSquared(InstanceLocation, CachedCameraLocation);
+	float MediumDistSq = LODConfig.MediumDistance * LODConfig.MediumDistance;
+	float FarDistSq = LODConfig.FarDistance * LODConfig.FarDistance;
+
+	// 根据距离确定 LOD 级别
+	if (DistanceToCamera <= MediumDistSq)
+	{
+		return 0; // 近距离
+	}
+	else if (DistanceToCamera <= FarDistSq)
+	{
+		return 1; // 中距离
+	}
+	else
+	{
+		return 2; // 远距离
+	}
+}
+
 void ASkelotWorld::RemoveInvalidHandles(bool bMaintainOrder, TArray<FSkelotInstanceHandle>& InOutHandles)
 {
 	if (bMaintainOrder)
