@@ -197,4 +197,51 @@ void RebuildIncremental(...)
 
 ---
 
-*最后更新: 2026-03-01*
+## RVO 系统类型转换问题 (2026-03-02)
+
+### 问题描述
+
+编译 SkelotRVOSystem.cpp 时出现类型转换错误：
+- `FVector3f` 无法隐式转换为 `FVector2f`
+- `FVector2f` 和 `FVector3f` 混用导致赋值失败
+
+### 根本原因
+
+1. 代码中 `FVector2f` 和 `FVector3f` 类型混用
+2. 注释格式错误导致变量定义被注释掉
+   ```cpp
+   // 错误示例：注释和代码在同一行
+   // 转换为 3D（XY 平面，	FVector3f MyPos(...);
+   ```
+
+### 解决方案
+
+1. **显式类型转换**：
+   ```cpp
+   // 错误
+   FVector2f PreferredVelocity = MyVel;  // MyVel 是 FVector3f
+
+   // 正确
+   FVector2f PreferredVelocity(MyVel.X, MyVel.Y);
+   ```
+
+2. **统一变量类型**：
+   - `NewVelocity2D` 从 `FVector3f` 改为 `FVector2f`
+   - 最后再转换回 `FVector3f` 输出
+
+3. **修复注释格式**：
+   ```cpp
+   // 正确：注释独占一行
+   // 转换为 3D（XY 平面）
+   FVector3f MyPos(MyPos3D.X, MyPos3D.Y, 0.0f);
+   ```
+
+### 经验总结
+
+- RVO/ORCA 算法本质是 2D 算法，只在 XY 平面计算
+- 内部计算使用 `FVector2f`，输入输出使用 `FVector3f`（Z=0）
+- 在类型边界处显式转换，避免隐式转换错误
+
+---
+
+*最后更新: 2026-03-02*
