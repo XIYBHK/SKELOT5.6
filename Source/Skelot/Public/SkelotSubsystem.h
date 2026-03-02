@@ -131,6 +131,27 @@ public:
 	static void SkelotQueryLocationOverlappingSphereWithMask(const UObject* WorldContextObject, const FVector& Center, float Radius, uint8 CollisionMask, TArray<FSkelotInstanceHandle>& Instances);
 
 	/**
+	 * 查询盒形范围内的实例
+	 * @param WorldContextObject 世界上下文对象
+	 * @param BoxCenter 盒子中心位置（世界坐标）
+	 * @param BoxExtent 盒子半尺寸（厘米）
+	 * @param Instances 输出实例句柄数组
+	 */
+	UFUNCTION(BlueprintCallable, Category="Skelot|工具", meta=(WorldContext="WorldContextObject", AutoCreateRefTerm = "BoxCenter", DisplayName = "查询盒形重叠位置"))
+	static void SkelotQueryLocationOverlappingBox(const UObject* WorldContextObject, const FVector& BoxCenter, const FVector& BoxExtent, TArray<FSkelotInstanceHandle>& Instances);
+
+	/**
+	 * 查询盒形范围内的实例（带碰撞掩码过滤）
+	 * @param WorldContextObject 世界上下文对象
+	 * @param BoxCenter 盒子中心位置（世界坐标）
+	 * @param BoxExtent 盒子半尺寸（厘米）
+	 * @param CollisionMask 碰撞掩码过滤，0xFF表示不过滤
+	 * @param Instances 输出实例句柄数组
+	 */
+	UFUNCTION(BlueprintCallable, Category="Skelot|工具", meta=(WorldContext="WorldContextObject", AutoCreateRefTerm = "BoxCenter", DisplayName = "查询盒形重叠位置(带掩码)"))
+	static void SkelotQueryLocationOverlappingBoxWithMask(const UObject* WorldContextObject, const FVector& BoxCenter, const FVector& BoxExtent, uint8 CollisionMask, TArray<FSkelotInstanceHandle>& Instances);
+
+	/**
 	 * 设置空间网格单元大小
 	 * @param WorldContextObject 世界上下文对象
 	 * @param CellSize 单元大小（厘米），建议设为查询半径的1-2倍

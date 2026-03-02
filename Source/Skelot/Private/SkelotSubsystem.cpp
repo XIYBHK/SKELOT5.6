@@ -171,6 +171,18 @@ void USkelotWorldSubsystem::SkelotQueryLocationOverlappingSphereWithMask(const U
 		Singleton->QueryLocationOverlappingSphereWithMask(Center, Radius, Instances, CollisionMask);
 }
 
+void USkelotWorldSubsystem::SkelotQueryLocationOverlappingBox(const UObject* WorldContextObject, const FVector& BoxCenter, const FVector& BoxExtent, TArray<FSkelotInstanceHandle>& Instances)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+		Singleton->QueryLocationOverlappingBox(BoxCenter, BoxExtent, Instances);
+}
+
+void USkelotWorldSubsystem::SkelotQueryLocationOverlappingBoxWithMask(const UObject* WorldContextObject, const FVector& BoxCenter, const FVector& BoxExtent, uint8 CollisionMask, TArray<FSkelotInstanceHandle>& Instances)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+		Singleton->QueryLocationOverlappingBoxWithMask(BoxCenter, BoxExtent, Instances, CollisionMask);
+}
+
 void USkelotWorldSubsystem::Skelot_SetSpatialGridCellSize(const UObject* WorldContextObject, float CellSize)
 {
 	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))

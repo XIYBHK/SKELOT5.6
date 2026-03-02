@@ -105,9 +105,9 @@
 | 任务 | 优先级 | 状态 | 说明 |
 |------|--------|------|------|
 | QueryLocationOverlappingSphere | P0 | ✅ | 球形范围查询，支持掩码过滤 |
-| QueryLocationOverlappingBox | P1 | ⬜ | 盒形范围查询 |
+| QueryLocationOverlappingBox | P1 | ✅ | 盒形范围查询 |
 | QuerySphere 掩码过滤 | P0 | ✅ | CollisionMask 参数过滤结果 |
-| QueryBox 掩码过滤 | P1 | ⬜ | CollisionMask 参数过滤结果 |
+| QueryBox 掩码过滤 | P1 | ✅ | CollisionMask 参数过滤结果 |
 | 空间网格调试可视化 | P2 | ⬜ | DrawDebug 网格边界 |
 
 ### 3.3 技术调研
@@ -328,14 +328,14 @@ git commit -m "feat(Ed): 实现编辑器扩展 - 右键菜单资产创建功能
 | Phase 1.5: 动画系统 | 5 | 5 | 100% |
 | Phase 2: 碰撞通道 | 10 | 10 | 100% |
 | Phase 2.5: 层级关系 | 4 | 4 | 100% |
-| Phase 3: 空间检测 | 13 | 6 | 46% |
+| Phase 3: 空间检测 | 13 | 8 | 62% |
 | Phase 4: PBD 系统 | 16 | 11 | 69% |
 | Phase 5: RVO 系统 | 18 | 17 | 94% |
 | Phase 6: LOD 系统 | 6 | 6 | 100% |
 | Phase 7: 几何工具 | 14 | 5 | 36% |
 | Phase 8: 编辑器 | 7 | 6 | 86% |
 | Phase 9: 示例文档 | 7 | 0 | 0% |
-| **总计** | **108** | **78** | **72%** |
+| **总计** | **108** | **80** | **74%** |
 
 ---
 
@@ -360,6 +360,7 @@ git commit -m "feat(Ed): 实现编辑器扩展 - 右键菜单资产创建功能
 
 | 日期 | 更新内容 |
 |------|----------|
+| 2026-03-02 | 完成 Phase 3.2 盒形范围查询：QueryLocationOverlappingBox/QueryLocationOverlappingBoxWithMask，支持空间网格优化和掩码过滤，在 ASkelotWorld 和 USkelotWorldSubsystem 中添加完整 API |
 | 2026-03-02 | 完成 Phase 8.2 调试工具：控制台命令(Skelot.DrawAllBounds/DrawSpatialGrid/DrawCollisionRadius/DrawVelocities/DrawNeighborLinks/Stats)、调试绘制(实例包围盒/空间网格/碰撞半径/速度向量/邻居连接线)、统计信息(实例数/更新时间/邻居密度)，创建 FSkelotDebugTools 类 |
 | 2026-03-02 | 完成 Phase 8.1 快速资产创建：右键菜单扩展、自动创建 AnimCollection、自动创建 RenderParams，创建 FSkelotAssetTypeActions_SkeletalMesh 类实现内容浏览器右键菜单扩展 |
 | 2026-03-02 | 完成 Phase 7 几何工具库核心功能：GetPointsByRound(圆形点阵)、GetPointsByGrid(1D/2D/3D网格)、GetBezierPoint(贝塞尔曲线)、GetPointsByShape(球/盒/胶囊表面与填充)，创建 USkelotGeometryTools 蓝图函数库 |

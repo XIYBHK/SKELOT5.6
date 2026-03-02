@@ -471,6 +471,23 @@ public:
 	void QueryLocationOverlappingSphereWithMask(const FVector& Center, float Radius, TArray<FSkelotInstanceHandle>& OutInstances, uint8 CollisionMask);
 
 	/**
+	 * 查询盒形范围内的实例
+	 * @param BoxCenter 盒子中心位置（世界坐标）
+	 * @param BoxExtent 盒子半尺寸（厘米）
+	 * @param OutInstances 输出实例句柄数组
+	 */
+	void QueryLocationOverlappingBox(const FVector& BoxCenter, const FVector& BoxExtent, TArray<FSkelotInstanceHandle>& OutInstances);
+
+	/**
+	 * 查询盒形范围内的实例（带碰撞掩码过滤）
+	 * @param BoxCenter 盒子中心位置（世界坐标）
+	 * @param BoxExtent 盒子半尺寸（厘米）
+	 * @param OutInstances 输出实例句柄数组
+	 * @param CollisionMask 碰撞掩码过滤，0xFF表示不过滤
+	 */
+	void QueryLocationOverlappingBoxWithMask(const FVector& BoxCenter, const FVector& BoxExtent, TArray<FSkelotInstanceHandle>& OutInstances, uint8 CollisionMask);
+
+	/**
 	 * 设置空间网格单元大小（厘米）
 	 * 建议：设为常用查询半径的1-2倍
 	 * @param CellSize 单元大小（厘米）

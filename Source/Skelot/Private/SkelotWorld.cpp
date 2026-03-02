@@ -2185,6 +2185,56 @@ void ASkelotWorld::QueryLocationOverlappingSphereWithMask(const FVector& Center,
 	}
 }
 
+void ASkelotWorld::QueryLocationOverlappingBox(const FVector& BoxCenter, const FVector& BoxExtent, TArray<FSkelotInstanceHandle>& OutInstances)
+{
+	QueryLocationOverlappingBoxWithMask(BoxCenter, BoxExtent, OutInstances, 0xFF);
+}
+
+void ASkelotWorld::QueryLocationOverlappingBoxWithMask(const FVector& BoxCenter, const FVector& BoxExtent, TArray<FSkelotInstanceHandle>& OutInstances, uint8 CollisionMask)
+{
+	// 使用空间网格优化查询
+	if (bEnableSpatialGrid && SpatialGrid.GetNumCells() > 0)
+	{
+		TArray<int32> Indices;
+		SpatialGrid.QueryBox(BoxCenter, BoxExtent, Indices, CollisionMask, &SOA);
+		OutInstances.Reserve(OutInstances.Num() + Indices.Num());
+		for (int32 Idx : Indices)
+		{
+			OutInstances.Add(IndexToHandle(Idx));
+		}
+	}
+	else
+	{
+		// 回退到简单遍历
+		FVector MinBounds = BoxCenter - BoxExtent;
+		FVector MaxBounds = BoxCenter + BoxExtent;
+
+		for (int32 InstanceIndex = 0; InstanceIndex < GetNumInstance(); InstanceIndex++)
+		{
+			if (IsInstanceAlive(InstanceIndex))
+			{
+				// 掩码过滤
+				if (CollisionMask != 0xFF)
+				{
+					uint8 InstanceMask = SOA.CollisionMasks[InstanceIndex];
+					if ((InstanceMask & CollisionMask) == 0)
+					{
+						continue;
+					}
+				}
+
+				const FVector& Loc = SOA.Locations[InstanceIndex];
+				if (Loc.X >= MinBounds.X && Loc.X <= MaxBounds.X &&
+					Loc.Y >= MinBounds.Y && Loc.Y <= MaxBounds.Y &&
+					Loc.Z >= MinBounds.Z && Loc.Z <= MaxBounds.Z)
+				{
+					OutInstances.Add(this->IndexToHandle(InstanceIndex));
+				}
+			}
+		}
+	}
+}
+
 void ASkelotWorld::SetSpatialGridCellSize(float CellSize)
 {
 	SpatialGrid.SetCellSize(CellSize);
