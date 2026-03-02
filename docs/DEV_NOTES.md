@@ -652,4 +652,45 @@ static FAutoConsoleVariableRef CVarDebugMode(
 
 ---
 
+## 调试绘制 API 兼容性 (2026-03-02)
+
+### 问题描述
+
+在实现性能测试 Actor 的 HUD 绘制时遇到编译错误：
+
+1. `DrawDebugRect` 函数不存在
+2. `ParseIntoArrayLines` 参数不正确
+3. `DrawDebugString` 在 Game 构建中不可用
+
+### 解决方案
+
+1. **DrawDebugRect 不存在**：移除背景绘制，简化 HUD
+
+2. **ParseIntoArrayLines 参数**：
+   ```cpp
+   // 错误
+   HUDText.ParseIntoArrayLines(Lines, TEXT("\n"), false);
+
+   // 正确
+   HUDText.ParseIntoArray(Lines, TEXT("\n"), true);
+   ```
+
+3. **Game 构建兼容**：
+   ```cpp
+   void DrawHUD()
+   {
+   #if ENABLE_DRAW_DEBUG
+       // 调试绘制代码...
+   #endif
+   }
+   ```
+
+### 关键规则
+
+- 所有 `DrawDebug*` 函数调用必须用 `#if ENABLE_DRAW_DEBUG` 包裹
+- Editor 编译通过不代表 Game 构建也能通过
+- QuickCompile.ps1 会同时测试 Editor + Game(Development + Shipping) 三种构建
+
+---
+
 *最后更新: 2026-03-02*

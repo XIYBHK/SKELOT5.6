@@ -34,16 +34,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    pwsh -ExecutionPolicy Bypass -File BuildPlugin_CN.ps1
    ```
 
-2. **更新任务进度** - 更新 `docs/TASK_LIST.md` 中的任务状态和进度统计
+2. **记录问题和解决方案** - 如果编译过程中遇到问题，**必须**记录到 `docs/DEV_NOTES.md`
+   - 格式：`## 问题标题 (日期)` + 问题描述 + 解决方案 + 关键规则
+   - 这是**强制要求**，不要遗漏
+
+3. **更新任务进度** - 更新 `docs/TASK_LIST.md` 中的任务状态和进度统计
    - 将完成的任务状态从 `⬜` 改为 `✅`
    - 更新"进度统计"表格中的已完成数量和百分比
    - 在"更新日志"部分添加当日完成记录
 
-3. **提交前检查** - 执行 git commit 前必须确认：
+4. **提交前检查** - 执行 git commit 前必须确认：
+   - ✅ 本次遇到的问题和解决方案已记录到 `docs/DEV_NOTES.md`（**强制**）
    - ✅ `docs/TASK_LIST.md` 任务列表已更新
-   - ✅ 本次遇到的问题和解决方案已记录到 `docs/DEV_NOTES.md`
 
-4. **提交 Git** - 使用规范的提交信息
+5. **提交 Git** - 使用规范的提交信息
    ```bash
    git add -A
    git commit -m "feat(module): 简短描述"

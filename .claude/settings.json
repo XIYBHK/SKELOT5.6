@@ -1,0 +1,31 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": {
+          "toolName": "Bash"
+        },
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '[提醒] 提交前请确认: 1.遇到的问题已记录到docs/DEV_NOTES.md 2.任务进度已更新到docs/TASK_LIST.md'"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": {
+          "toolName": "Bash",
+          "commandContains": "git commit"
+        },
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '[提醒] 提交完成! 请检查 docs/DEV_NOTES.md 是否已记录本次遇到的问题和解决方案'"
+          }
+        ]
+      }
+    ]
+  }
+}
