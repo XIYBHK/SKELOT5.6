@@ -309,7 +309,7 @@ git commit -m "feat(Ed): 实现编辑器扩展 - 右键菜单资产创建功能
 | 基础实例创建示例 | P1 | ✅ | 创建/销毁/动画 |
 | 碰撞避让示例 | P1 | ✅ | PBD + RVO 演示 |
 | 几何工具示例 | P2 | ✅ | 各种点位生成 |
-| 性能测试关卡 | P2 | ⬜ | 4-5w 实例压力测试 |
+| 性能测试关卡 | P2 | ✅ | 4-5w 实例压力测试 |
 
 ### 9.2 文档更新
 | 任务 | 优先级 | 状态 | 说明 |
@@ -334,8 +334,8 @@ git commit -m "feat(Ed): 实现编辑器扩展 - 右键菜单资产创建功能
 | Phase 6: LOD 系统 | 6 | 6 | 100% |
 | Phase 7: 几何工具 | 14 | 11 | 79% |
 | Phase 8: 编辑器 | 7 | 6 | 86% |
-| Phase 9: 示例文档 | 7 | 3 | 43% |
-| **总计** | **108** | **92** | **85%** |
+| Phase 9: 示例文档 | 7 | 4 | 57% |
+| **总计** | **108** | **93** | **86%** |
 
 ---
 
@@ -360,6 +360,7 @@ git commit -m "feat(Ed): 实现编辑器扩展 - 右键菜单资产创建功能
 
 | 日期 | 更新内容 |
 |------|----------|
+| 2026-03-02 | 完成 Phase 9.1 性能测试关卡：ASkelotExampleStressTest Actor，支持 4-5w 实例压力测试，FPS/帧时间统计，HUD 显示，四种测试模式（静态/移动/移动+PBD/移动+PBD+RVO），键盘交互控制 |
 | 2026-03-02 | 完成 Phase 7 几何工具库剩余功能：GetPointsByMesh（静态网格表面点+三角形面积加权采样）、GetPointsByMeshVoxel（体素化外壳/实心）、GetPointsBySpline（样条曲线点带）、GetPixelsByTexture（纹理像素提取），Mesh/Voxel 功能仅编辑器可用 |
 | 2026-03-02 | 完成 Phase 9.1 示例关卡 Actor 类：ASkelotExampleBasicInstance（基础实例创建/销毁/动画）、ASkelotExampleCollisionAvoidance（PBD+RVO碰撞避让）、ASkelotExampleGeometryTools（几何工具点位生成），支持键盘交互演示各功能，添加 InputCore 模块依赖 |
 | 2026-03-02 | 完成 Phase 4.3 障碍物系统：SkelotSphereObstacle（球形障碍物）、SkelotBoxObstacle（盒形障碍物）、障碍物与实例碰撞检测，创建 ASkelotObstacle 基类和派生类，在 FSkelotPBDCollisionSystem 中添加 SolveObstacleCollisions 方法，在 ASkelotWorld 中添加障碍物注册/注销/查询 API |

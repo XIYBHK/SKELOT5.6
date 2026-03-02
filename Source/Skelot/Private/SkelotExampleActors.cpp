@@ -726,3 +726,391 @@ void ASkelotExampleGeometryTools::SpawnWithBezierPattern()
 	// 批量创建实例
 	World->CreateInstances(Transforms, RenderParams, InstanceHandles);
 }
+
+
+//////////////////////////////////////////////////////////////////////////
+// ASkelotExampleStressTest
+//////////////////////////////////////////////////////////////////////////
+
+ASkelotExampleStressTest::ASkelotExampleStressTest()
+{
+	PrimaryActorTick.bCanEverTick = true;
+}
+
+void ASkelotExampleStressTest::BeginPlay()
+{
+	Super::BeginPlay();
+
+	SkelotWorld = USkelotWorldSubsystem::GetSingleton(this);
+	LastFrameTime = FPlatformTime::Seconds();
+}
+
+void ASkelotExampleStressTest::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	HandleKeyboardInput();
+
+	if (bTestRunning)
+	{
+		UpdateFPSStats(DeltaTime);
+
+		// 根据测试模式更新
+		if (TestMode >= 1) // 移动模式
+		{
+			UpdateInstanceMovement(DeltaTime);
+		}
+
+		if (bShowHUD)
+		{
+			DrawHUD();
+		}
+	}
+}
+
+void ASkelotExampleStressTest::StartTest()
+{
+	if (bTestRunning || !RenderParams)
+	{
+		return;
+	}
+
+	SkelotWorld = USkelotWorldSubsystem::GetSingleton(this);
+	if (!SkelotWorld)
+	{
+		return;
+	}
+
+	// 重置统计
+	CurrentFPS = 0.0f;
+	AverageFPS = 0.0f;
+	MinFPS = FLT_MAX;
+	MaxFPS = 0.0f;
+	FPSAccumulator = 0.0f;
+	FPSFrameCount = 0;
+	FrameCount = 0;
+	TestStartTime = FPlatformTime::Seconds();
+
+	// 应用配置
+	ApplyConfigs();
+
+	// 生成实例
+	TArray<FTransform> Transforms;
+	Transforms.Reserve(InstanceCount);
+
+	// 使用网格布局生成，更均匀
+	int32 GridSize = FMath::CeilToInt(FMath::Sqrt(static_cast<float>(InstanceCount)));
+	float GridSpacing = SpawnRadius * 2.0f / GridSize;
+
+	for (int32 i = 0; i < InstanceCount; ++i)
+	{
+		int32 X = i % GridSize;
+		int32 Y = i / GridSize;
+
+		FVector Location(
+			GetActorLocation().X + (X - GridSize / 2) * GridSpacing,
+			GetActorLocation().Y + (Y - GridSize / 2) * GridSpacing,
+			GetActorLocation().Z
+		);
+
+		// 添加小随机偏移
+		Location += FVector(FMath::FRand() * 10.0f, FMath::FRand() * 10.0f, 0.0f);
+
+		Transforms.Add(FTransform(Location));
+	}
+
+	// 批量创建
+	SkelotWorld->CreateInstances(Transforms, RenderParams, InstanceHandles);
+
+	// 播放动画
+	if (WalkAnimation)
+	{
+		FSkelotAnimPlayParams Params;
+		Params.Animation = WalkAnimation;
+		Params.bLoop = true;
+		Params.PlayScale = 1.0f;
+
+		for (const FSkelotInstanceHandle& Handle : InstanceHandles)
+		{
+			SkelotWorld->InstancePlayAnimation(Handle.InstanceIndex, Params);
+		}
+	}
+
+	bTestRunning = true;
+	UE_LOG(LogTemp, Log, TEXT("Skelot Stress Test Started: %d instances, Mode %d"), InstanceCount, TestMode);
+}
+
+void ASkelotExampleStressTest::StopTest()
+{
+	if (!bTestRunning)
+	{
+		return;
+	}
+
+	// 销毁所有实例
+	USkelotWorldSubsystem::Skelot_DestroyInstances(this, InstanceHandles);
+	InstanceHandles.Empty();
+
+	bTestRunning = false;
+
+	double TestDuration = FPlatformTime::Seconds() - TestStartTime;
+	UE_LOG(LogTemp, Log, TEXT("Skelot Stress Test Stopped: Duration=%.2fs, AvgFPS=%.2f, MinFPS=%.2f, MaxFPS=%.2f"),
+		TestDuration, AverageFPS, MinFPS, MaxFPS);
+}
+
+void ASkelotExampleStressTest::CycleTestMode()
+{
+	TestMode = (TestMode + 1) % 4;
+
+	if (bTestRunning)
+	{
+		ApplyConfigs();
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("Test Mode Changed to: %s"), *GetTestModeName());
+}
+
+FString ASkelotExampleStressTest::GetTestModeName() const
+{
+	switch (TestMode)
+	{
+	case 0:
+		return TEXT("静态渲染");
+	case 1:
+		return TEXT("移动");
+	case 2:
+		return TEXT("移动 + PBD碰撞");
+	case 3:
+		return TEXT("移动 + PBD + RVO避障");
+	default:
+		return TEXT("未知");
+	}
+}
+
+void ASkelotExampleStressTest::HandleKeyboardInput()
+{
+	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	if (!PC)
+	{
+		return;
+	}
+
+	if (PC->WasInputKeyJustPressed(StartTestKey))
+	{
+		StartTest();
+	}
+
+	if (PC->WasInputKeyJustPressed(StopTestKey))
+	{
+		StopTest();
+	}
+
+	if (PC->WasInputKeyJustPressed(ToggleModeKey))
+	{
+		CycleTestMode();
+	}
+
+	if (PC->WasInputKeyJustPressed(ToggleHUDKey))
+	{
+		bShowHUD = !bShowHUD;
+	}
+}
+
+void ASkelotExampleStressTest::UpdateFPSStats(float DeltaTime)
+{
+	// 计算当前 FPS
+	double CurrentTime = FPlatformTime::Seconds();
+	float ActualDeltaTime = static_cast<float>(CurrentTime - LastFrameTime);
+	LastFrameTime = CurrentTime;
+
+	if (ActualDeltaTime > 0.0f)
+	{
+		CurrentFPS = 1.0f / ActualDeltaTime;
+		FrameTimeMs = ActualDeltaTime * 1000.0f;
+	}
+	else
+	{
+		CurrentFPS = 0.0f;
+		FrameTimeMs = 0.0f;
+	}
+
+	// 更新统计
+	FPSAccumulator += CurrentFPS;
+	FPSFrameCount++;
+	FrameCount++;
+
+	if (FPSFrameCount > 0)
+	{
+		AverageFPS = FPSAccumulator / FPSFrameCount;
+		AverageFrameTimeMs = 1000.0f / AverageFPS;
+	}
+
+	if (CurrentFPS > 0.0f)
+	{
+		MinFPS = FMath::Min(MinFPS, CurrentFPS);
+		MaxFPS = FMath::Max(MaxFPS, CurrentFPS);
+	}
+}
+
+void ASkelotExampleStressTest::DrawHUD()
+{
+#if ENABLE_DRAW_DEBUG
+	// 使用 DrawDebug 绘制 HUD 信息
+	if (!GetWorld())
+	{
+		return;
+	}
+
+	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	if (!PC)
+	{
+		return;
+	}
+
+	// HUD 起始位置
+	FVector2D HUDPos(50.0f, 50.0f);
+	float LineHeight = 25.0f * HUDTextSize;
+
+	// 构建 HUD 文本
+	TArray<FString> Lines;
+
+	// 标题
+	Lines.Add(TEXT("=== Skelot 性能测试 ==="));
+	Lines.Add(FString::Printf(TEXT("测试模式: %s"), *GetTestModeName()));
+	Lines.Add(FString::Printf(TEXT("实例数量: %d"), InstanceHandles.Num()));
+	Lines.Add(TEXT(""));
+
+	// FPS 统计
+	Lines.Add(FString::Printf(TEXT("当前 FPS: %.1f"), CurrentFPS));
+	Lines.Add(FString::Printf(TEXT("平均 FPS: %.1f"), AverageFPS));
+	Lines.Add(FString::Printf(TEXT("最低 FPS: %.1f"), MinFPS == FLT_MAX ? 0.0f : MinFPS));
+	Lines.Add(FString::Printf(TEXT("最高 FPS: %.1f"), MaxFPS));
+	Lines.Add(TEXT(""));
+
+	// 帧时间
+	Lines.Add(FString::Printf(TEXT("帧时间: %.2f ms"), FrameTimeMs));
+	Lines.Add(FString::Printf(TEXT("平均帧时间: %.2f ms"), AverageFrameTimeMs));
+	Lines.Add(TEXT(""));
+
+	// 测试时长
+	double TestDuration = FPlatformTime::Seconds() - TestStartTime;
+	Lines.Add(FString::Printf(TEXT("测试时长: %.1f 秒"), TestDuration));
+	Lines.Add(FString::Printf(TEXT("总帧数: %lld"), FrameCount));
+
+	// 操作提示
+	Lines.Add(TEXT(""));
+	Lines.Add(TEXT("--- 操作 ---"));
+	Lines.Add(TEXT("Enter: 开始测试"));
+	Lines.Add(TEXT("Esc: 停止测试"));
+	Lines.Add(TEXT("M: 切换模式"));
+	Lines.Add(TEXT("H: 切换HUD"));
+
+	// 绘制文本
+	for (int32 i = 0; i < Lines.Num(); ++i)
+	{
+		FVector TextPos(HUDPos.X, 0.0f, HUDPos.Y + i * LineHeight);
+		DrawDebugString(GetWorld(), TextPos, Lines[i], nullptr, FColor::White, 0.0f, false, HUDTextSize);
+	}
+#endif
+}
+
+void ASkelotExampleStressTest::ApplyConfigs()
+{
+	if (!SkelotWorld)
+	{
+		return;
+	}
+
+	// PBD 配置
+	FSkelotPBDConfig PBDConfig = SkelotWorld->GetPBDConfig();
+	PBDConfig.bEnablePBD = (TestMode >= 2);
+	PBDConfig.CollisionRadius = PBDCollisionRadius;
+	SkelotWorld->SetPBDConfig(PBDConfig);
+
+	// RVO 配置
+	FSkelotRVOConfig RVOConfig = SkelotWorld->GetRVOConfig();
+	RVOConfig.bEnableRVO = (TestMode >= 3);
+	RVOConfig.NeighborRadius = RVONeighborRadius;
+	SkelotWorld->SetRVOConfig(RVOConfig);
+}
+
+void ASkelotExampleStressTest::UpdateInstanceMovement(float DeltaTime)
+{
+	if (!SkelotWorld || InstanceHandles.Num() == 0)
+	{
+		return;
+	}
+
+	// 简单的随机移动 - 每个实例向随机方向移动
+	// 使用固定随机种子保证可重复性
+	FRandomStream RandomStream(12345);
+
+	// 每隔一段时间改变移动方向
+	static float DirectionChangeTimer = 0.0f;
+	static TArray<FVector> TargetDirections;
+
+	DirectionChangeTimer += DeltaTime;
+
+	if (DirectionChangeTimer > 5.0f || TargetDirections.Num() != InstanceHandles.Num())
+	{
+		// 重新生成目标方向
+		TargetDirections.Empty();
+		TargetDirections.Reserve(InstanceHandles.Num());
+
+		for (int32 i = 0; i < InstanceHandles.Num(); ++i)
+		{
+			FVector Dir = RandomStream.VRand();
+			Dir.Z = 0;
+			Dir.Normalize();
+			TargetDirections.Add(Dir);
+		}
+
+		DirectionChangeTimer = 0.0f;
+	}
+
+	// 批量更新速度（性能优化）
+	const int32 BatchSize = 1000;
+	for (int32 i = 0; i < InstanceHandles.Num(); ++i)
+	{
+		if (!SkelotWorld->IsHandleValid(InstanceHandles[i]))
+		{
+			continue;
+		}
+
+		// 获取当前位置
+		FVector CurrentLoc = SkelotWorld->GetInstanceLocation(InstanceHandles[i].InstanceIndex);
+
+		// 检查是否超出范围
+		FVector ToCenter = GetActorLocation() - CurrentLoc;
+		ToCenter.Z = 0;
+		float DistToCenter = ToCenter.Size();
+
+		FVector MoveDir;
+
+		if (DistToCenter > SpawnRadius * 0.9f)
+		{
+			// 超出范围，向中心移动
+			MoveDir = ToCenter.GetSafeNormal();
+		}
+		else
+		{
+			// 正常移动
+			MoveDir = TargetDirections[i];
+		}
+
+		// 设置速度
+		FVector3f Velocity = FVector3f(MoveDir * MoveSpeed);
+		SkelotWorld->SetInstanceVelocity(InstanceHandles[i].InstanceIndex, Velocity);
+
+		// 更新位置
+		FVector NewLoc = CurrentLoc + MoveDir * MoveSpeed * DeltaTime;
+		SkelotWorld->SetInstanceLocation(InstanceHandles[i].InstanceIndex, NewLoc);
+
+		// 朝向移动方向
+		if (!MoveDir.IsNearlyZero())
+		{
+			FQuat TargetRotation = FRotationMatrix::MakeFromX(MoveDir).Rotator().Quaternion();
+			SkelotWorld->SetInstanceRotation(InstanceHandles[i].InstanceIndex, FQuat4f(TargetRotation));
+		}
+	}
+}

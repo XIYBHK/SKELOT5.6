@@ -575,4 +575,81 @@ static FAutoConsoleVariableRef CVarDebugMode(
 
 ---
 
+## UE API 源码复验 (2026-03-02)
+
+### 复验背景
+
+根据 `CLAUDE.md` 中建立的 UE 内置 API 源码核查机制，对之前完成的任务中涉及的 UE API 使用进行源码复验，确认解决方案的正确性。
+
+### 已验证的 API（UE 5.6 源码）
+
+| API | 源码位置 | 验证结果 |
+|-----|----------|----------|
+| `FRawStaticIndexBuffer::GetArrayView()` | `RawIndexBuffer.h:253` | 返回 `FIndexArrayView` |
+| `FIndexArrayView::operator[]` | `RawIndexBuffer.h:116-117` | 支持 16/32 位索引自动转换 |
+| `DrawDebugBox(..., FQuat&, ...)` | `DrawDebugHelpers.h:30` | 带旋转参数版本需要 `FQuat` |
+| `FTexturePlatformData::Mips` | `Texture.h:853` | 类型为 `TIndirectArray<FTexture2DMipMap>` |
+| `TObjectPtr::Get()` | `ObjectPtr.h:681` | 返回 `T*`，无 `IsValid()` 方法 |
+
+### 验证通过的解决方案
+
+1. **索引缓冲访问**
+   ```cpp
+   // 正确做法（已验证）
+   FIndexArrayView IndexArrayView = IndexBuffer.GetArrayView();
+   const uint32 Vtx0 = IndexArrayView[IndexBase];
+   ```
+   - 源码：`FRawStaticIndexBuffer::GetArrayView()` 返回 `FIndexArrayView`
+   - `FIndexArrayView::operator[]` 自动处理 16/32 位索引
+
+2. **DrawDebugBox 旋转参数**
+   ```cpp
+   // 正确做法（已验证）
+   DrawDebugBox(World, Location, Extent, GetActorQuat(), Color, ...);
+   ```
+   - 源码：`DrawDebugHelpers.h:30` 声明 `DrawDebugBox(..., const FQuat& Rotation, ...)`
+   - 注意：`KismetSystemLibrary.h:1653` 的蓝图版本使用 `FRotator`，但 `DrawDebugHelpers` 版本需要 `FQuat`
+
+3. **FBox 角点获取**
+   ```cpp
+   // 正确做法（已验证）- FBox 没有 GetCorner() 方法
+   const FVector Corners[8] = {
+       FVector(Min.X, Min.Y, Min.Z),
+       FVector(Max.X, Min.Y, Min.Z),
+       // ... 其余 6 个角点
+   };
+   ```
+
+4. **纹理 Mips 访问**
+   ```cpp
+   // 正确做法（已验证）
+   FTexturePlatformData* PlatformData = Texture->GetPlatformData();
+   TArray<FTexture2DMipMap>& Mips = PlatformData->Mips;  // 直接访问成员
+   FTexture2DMipMap& Mip = Mips[0];
+   ```
+   - 源码：`Texture.h:853` 定义为 `TIndirectArray<struct FTexture2DMipMap> Mips;`
+
+5. **TObjectPtr 判空**
+   ```cpp
+   // 正确做法（已验证）- TObjectPtr 没有 IsValid() 方法
+   if (!ObstaclePtr.Get()) { ... }  // 方式1：Get() 返回原始指针
+   if (!ObstaclePtr) { ... }        // 方式2：operator bool()
+   ```
+   - 源码：`ObjectPtr.h` 中 `TObjectPtr` 只有 `Get()` 和 `operator bool()`，无 `IsValid()`
+
+### 源码位置参考
+
+常用 UE 模块路径（`D:\UE\UE_5.6\Engine\Source`）：
+- `Runtime/Core/Public/Math/` - 数学类型（FVector, FQuat 等）
+- `Runtime/CoreUObject/Public/UObject/` - UObject 相关（TObjectPtr 等）
+- `Runtime/Engine/Public/` - 引擎公共接口（DrawDebugHelpers 等）
+- `Runtime/Engine/Classes/Engine/` - 引擎类定义（Texture, StaticMesh 等）
+- `Runtime/Engine/Private/` - 引擎实现（调试绘制等）
+
+### 复验结论
+
+所有之前记录的 UE API 问题和解决方案都已通过 UE 5.6 源码验证，实现代码使用的 API 符合 UE 5.6 的实际定义。
+
+---
+
 *最后更新: 2026-03-02*
