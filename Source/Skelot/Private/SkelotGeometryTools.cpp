@@ -5,6 +5,13 @@
 #include "Components/SphereComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SplineComponent.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/Texture2D.h"
+
+#if WITH_EDITORONLY_DATA
+#include "StaticMeshResources.h"
+#endif
 
 TArray<FVector> USkelotGeometryTools::GetPointsByRound(FVector Origin, float Radius, float Distance, float Noise)
 {
@@ -486,4 +493,555 @@ TArray<FVector> USkelotGeometryTools::GetPointsByShape(UPrimitiveComponent* Shap
 	}
 
 	return Points;
+}
+
+// ============================================================================
+// 辅助函数
+// ============================================================================
+
+FVector USkelotGeometryTools::GetRandomPointInTriangle(const FVector& V0, const FVector& V1, const FVector& V2)
+{
+	// 使用重心坐标在三角形内生成均匀分布的随机点
+	float R1 = FMath::Sqrt(FMath::FRand());
+	float R2 = FMath::FRand();
+
+	// 重心坐标: (1 - sqrt(r1)) * V0 + sqrt(r1) * (1 - r2) * V1 + sqrt(r1) * r2 * V2
+	return (1.0f - R1) * V0 + R1 * (1.0f - R2) * V1 + R1 * R2 * V2;
+}
+
+float USkelotGeometryTools::GetTriangleArea(const FVector& V0, const FVector& V1, const FVector& V2)
+{
+	// 使用叉积计算三角形面积 = |(V1-V0) x (V2-V0)| / 2
+	FVector Cross = FVector::CrossProduct(V1 - V0, V2 - V0);
+	return Cross.Size() * 0.5f;
+}
+
+// ============================================================================
+// 静态网格表面点生成
+// ============================================================================
+
+TArray<FVector> USkelotGeometryTools::GetPointsByMesh(UStaticMesh* Mesh, FTransform Transform, float Distance, float Noise, int32 LODIndex)
+{
+	TArray<FVector> Points;
+
+	// 参数验证
+	if (!Mesh || Distance <= 0.0f)
+	{
+		return Points;
+	}
+
+#if WITH_EDITORONLY_DATA
+	// 获取渲染数据
+	FStaticMeshRenderData* RenderData = Mesh->GetRenderData();
+	if (!RenderData || RenderData->LODResources.Num() <= LODIndex)
+	{
+		return Points;
+	}
+
+	const FStaticMeshLODResources& LODResources = RenderData->LODResources[LODIndex];
+	const FPositionVertexBuffer& PositionBuffer = LODResources.VertexBuffers.PositionVertexBuffer;
+	const uint32 NumVertices = PositionBuffer.GetNumVertices();
+
+	if (NumVertices == 0)
+	{
+		return Points;
+	}
+
+	// 收集所有三角形顶点
+	TArray<FVector> AllTriangles;
+
+	// 使用 Section 遍历三角形
+	const int32 NumSections = LODResources.Sections.Num();
+
+	for (int32 SectionIndex = 0; SectionIndex < NumSections; ++SectionIndex)
+	{
+		const FStaticMeshSection& Section = LODResources.Sections[SectionIndex];
+		if (Section.NumTriangles == 0)
+		{
+			continue;
+		}
+
+		// 遍历 Section 中的三角形
+		for (uint32 TriIdx = 0; TriIdx < Section.NumTriangles; ++TriIdx)
+		{
+			const uint32 BaseIndex = Section.FirstIndex + TriIdx * 3;
+
+			// 获取三角形顶点 - 使用顶点索引
+			if (BaseIndex + 2 < NumVertices)
+			{
+				FVector V0 = FVector(PositionBuffer.VertexPosition(BaseIndex));
+				FVector V1 = FVector(PositionBuffer.VertexPosition(BaseIndex + 1));
+				FVector V2 = FVector(PositionBuffer.VertexPosition(BaseIndex + 2));
+
+				// 应用变换
+				V0 = Transform.TransformPosition(V0);
+				V1 = Transform.TransformPosition(V1);
+				V2 = Transform.TransformPosition(V2);
+
+				AllTriangles.Add(V0);
+				AllTriangles.Add(V1);
+				AllTriangles.Add(V2);
+			}
+		}
+	}
+
+	if (AllTriangles.Num() == 0)
+	{
+		return Points;
+	}
+
+	// 计算总面积
+	float TotalArea = 0.0f;
+	TArray<float> CumulativeAreas;
+
+	for (int32 i = 0; i < AllTriangles.Num(); i += 3)
+	{
+		float Area = GetTriangleArea(AllTriangles[i], AllTriangles[i + 1], AllTriangles[i + 2]);
+		TotalArea += Area;
+		CumulativeAreas.Add(TotalArea);
+	}
+
+	if (TotalArea <= KINDA_SMALL_NUMBER)
+	{
+		return Points;
+	}
+
+	// 计算需要生成的点数
+	const float PointArea = Distance * Distance;
+	const int32 NumPoints = FMath::CeilToInt(TotalArea / PointArea);
+
+	Points.Reserve(NumPoints);
+
+	// 使用三角形面积加权采样生成点
+	for (int32 i = 0; i < NumPoints; ++i)
+	{
+		float RandomArea = FMath::FRand() * TotalArea;
+
+		int32 SelectedTriIndex = 0;
+		for (int32 j = 0; j < CumulativeAreas.Num(); ++j)
+		{
+			if (CumulativeAreas[j] >= RandomArea)
+			{
+				SelectedTriIndex = j;
+				break;
+			}
+		}
+
+		const int32 TriBase = SelectedTriIndex * 3;
+		FVector Point = GetRandomPointInTriangle(AllTriangles[TriBase], AllTriangles[TriBase + 1], AllTriangles[TriBase + 2]);
+
+		if (Noise > 0.0f)
+		{
+			Point = ApplyNoise(Point, Noise);
+		}
+
+		Points.Add(Point);
+	}
+#else
+	// 运行时版本暂不支持，返回空数组
+	// 可以考虑使用 Physics API 或其他运行时可用的方法
+#endif
+
+	return Points;
+}
+
+// ============================================================================
+// 静态网格体素化点生成
+// ============================================================================
+
+TArray<FVector> USkelotGeometryTools::GetPointsByMeshVoxel(UStaticMesh* Mesh, FTransform Transform, float VoxelSize, bool bSolid, float Noise, int32 LODIndex)
+{
+	TArray<FVector> Points;
+
+	// 参数验证
+	if (!Mesh || VoxelSize <= 0.0f)
+	{
+		return Points;
+	}
+
+#if WITH_EDITORONLY_DATA
+	// 获取网格包围盒
+	FBoxSphereBounds MeshBounds = Mesh->GetBounds();
+	FBox LocalBounds = MeshBounds.GetBox();
+
+	// 扩展包围盒
+	FBox ExpandedBounds = LocalBounds;
+	ExpandedBounds.Min -= FVector(VoxelSize);
+	ExpandedBounds.Max += FVector(VoxelSize);
+
+	// 计算变换后的包围盒 - 手动计算8个角点
+	FBox WorldBounds(ForceInit);
+	const FVector Corners[8] = {
+		FVector(ExpandedBounds.Min.X, ExpandedBounds.Min.Y, ExpandedBounds.Min.Z),
+		FVector(ExpandedBounds.Max.X, ExpandedBounds.Min.Y, ExpandedBounds.Min.Z),
+		FVector(ExpandedBounds.Min.X, ExpandedBounds.Max.Y, ExpandedBounds.Min.Z),
+		FVector(ExpandedBounds.Max.X, ExpandedBounds.Max.Y, ExpandedBounds.Min.Z),
+		FVector(ExpandedBounds.Min.X, ExpandedBounds.Min.Y, ExpandedBounds.Max.Z),
+		FVector(ExpandedBounds.Max.X, ExpandedBounds.Min.Y, ExpandedBounds.Max.Z),
+		FVector(ExpandedBounds.Min.X, ExpandedBounds.Max.Y, ExpandedBounds.Max.Z),
+		FVector(ExpandedBounds.Max.X, ExpandedBounds.Max.Y, ExpandedBounds.Max.Z)
+	};
+
+	for (int32 i = 0; i < 8; ++i)
+	{
+		WorldBounds += Transform.TransformPosition(Corners[i]);
+	}
+
+	// 体素网格尺寸
+	const FIntVector GridSize(
+		FMath::CeilToInt(WorldBounds.GetSize().X / VoxelSize),
+		FMath::CeilToInt(WorldBounds.GetSize().Y / VoxelSize),
+		FMath::CeilToInt(WorldBounds.GetSize().Z / VoxelSize)
+	);
+
+	if (GridSize.X <= 0 || GridSize.Y <= 0 || GridSize.Z <= 0)
+	{
+		return Points;
+	}
+
+	// 收集所有三角形用于内外测试
+	TArray<FVector> Triangles;
+
+	// 获取渲染数据
+	FStaticMeshRenderData* RenderData = Mesh->GetRenderData();
+	if (!RenderData || RenderData->LODResources.Num() <= LODIndex)
+	{
+		return Points;
+	}
+
+	const FStaticMeshLODResources& LODResources = RenderData->LODResources[LODIndex];
+	const FPositionVertexBuffer& PositionBuffer = LODResources.VertexBuffers.PositionVertexBuffer;
+	const uint32 NumVertices = PositionBuffer.GetNumVertices();
+
+	if (NumVertices == 0)
+	{
+		return Points;
+	}
+
+	// 使用 Section 遍历
+	const int32 NumSections = LODResources.Sections.Num();
+
+	for (int32 SectionIndex = 0; SectionIndex < NumSections; ++SectionIndex)
+	{
+		const FStaticMeshSection& Section = LODResources.Sections[SectionIndex];
+		if (Section.NumTriangles == 0)
+		{
+			continue;
+		}
+
+		for (uint32 TriIdx = 0; TriIdx < Section.NumTriangles; ++TriIdx)
+		{
+			const uint32 BaseIndex = Section.FirstIndex + TriIdx * 3;
+
+			if (BaseIndex + 2 < NumVertices)
+			{
+				FVector V0 = FVector(PositionBuffer.VertexPosition(BaseIndex));
+				FVector V1 = FVector(PositionBuffer.VertexPosition(BaseIndex + 1));
+				FVector V2 = FVector(PositionBuffer.VertexPosition(BaseIndex + 2));
+
+				V0 = Transform.TransformPosition(V0);
+				V1 = Transform.TransformPosition(V1);
+				V2 = Transform.TransformPosition(V2);
+
+				Triangles.Add(V0);
+				Triangles.Add(V1);
+				Triangles.Add(V2);
+			}
+		}
+	}
+
+	if (Triangles.Num() == 0)
+	{
+		return Points;
+	}
+
+	// 使用射线投射判断点是否在网格内
+	auto IsPointInsideMesh = [&Triangles](const FVector& Point) -> bool
+	{
+		// 使用射线投射法：从点向任意方向发射射线，计算与三角形的交点数
+		// 奇数 = 在内部，偶数 = 在外部
+		const FVector RayEnd = Point + FVector(1000000.0f, 0.0f, 0.0f);
+		int32 IntersectionCount = 0;
+
+		for (int32 i = 0; i < Triangles.Num(); i += 3)
+		{
+			const FVector& V0 = Triangles[i];
+			const FVector& V1 = Triangles[i + 1];
+			const FVector& V2 = Triangles[i + 2];
+
+			// 使用 Moller-Trumbore 算法的简化版本
+			FVector Edge1 = V1 - V0;
+			FVector Edge2 = V2 - V0;
+			FVector RayDir = RayEnd - Point;
+
+			FVector h = FVector::CrossProduct(RayDir, Edge2);
+			float a = FVector::DotProduct(Edge1, h);
+
+			if (FMath::Abs(a) < KINDA_SMALL_NUMBER)
+			{
+				continue;
+			}
+
+			float f = 1.0f / a;
+			FVector s = Point - V0;
+			float u = f * FVector::DotProduct(s, h);
+
+			if (u < 0.0f || u > 1.0f)
+			{
+				continue;
+			}
+
+			FVector q = FVector::CrossProduct(s, Edge1);
+			float v = f * FVector::DotProduct(RayDir, q);
+
+			if (v < 0.0f || u + v > 1.0f)
+			{
+				continue;
+			}
+
+			float t = f * FVector::DotProduct(Edge2, q);
+
+			if (t > KINDA_SMALL_NUMBER)
+			{
+				IntersectionCount++;
+			}
+		}
+
+		return (IntersectionCount % 2) == 1;
+	};
+
+	// 检查体素是否与任何三角形相交
+	auto DoesVoxelIntersectMesh = [&Triangles, VoxelSize](const FVector& VoxelCenter) -> bool
+	{
+		const float HalfVoxel = VoxelSize * 0.5f;
+		const float SearchRadius = HalfVoxel * FMath::Sqrt(3.0f);
+
+		for (int32 i = 0; i < Triangles.Num(); i += 3)
+		{
+			const FVector& V0 = Triangles[i];
+			const FVector& V1 = Triangles[i + 1];
+			const FVector& V2 = Triangles[i + 2];
+
+			FVector ClosestPoint = FMath::ClosestPointOnTriangleToPoint(VoxelCenter, V0, V1, V2);
+			float DistSq = FVector::DistSquared(VoxelCenter, ClosestPoint);
+
+			if (DistSq <= SearchRadius * SearchRadius)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	};
+
+	// 遍历体素网格
+	const FVector WorldOrigin = WorldBounds.Min;
+
+	for (int32 Z = 0; Z < GridSize.Z; ++Z)
+	{
+		for (int32 Y = 0; Y < GridSize.Y; ++Y)
+		{
+			for (int32 X = 0; X < GridSize.X; ++X)
+			{
+				FVector VoxelCenter = WorldOrigin + FVector(
+					(X + 0.5f) * VoxelSize,
+					(Y + 0.5f) * VoxelSize,
+					(Z + 0.5f) * VoxelSize
+				);
+
+				bool bIncludeVoxel = false;
+
+				if (bSolid)
+				{
+					bIncludeVoxel = IsPointInsideMesh(VoxelCenter);
+				}
+				else
+				{
+					bIncludeVoxel = DoesVoxelIntersectMesh(VoxelCenter);
+				}
+
+				if (bIncludeVoxel)
+				{
+					if (Noise > 0.0f)
+					{
+						VoxelCenter = ApplyNoise(VoxelCenter, Noise);
+					}
+					Points.Add(VoxelCenter);
+				}
+			}
+		}
+	}
+#else
+	// 运行时版本暂不支持
+#endif
+
+	return Points;
+}
+
+// ============================================================================
+// 样条曲线点带生成
+// ============================================================================
+
+TArray<FVector> USkelotGeometryTools::GetPointsBySpline(USplineComponent* SplineComponent, int32 CountX, int32 CountY, float Width, float Noise)
+{
+	TArray<FVector> Points;
+
+	// 参数验证
+	if (!SplineComponent || CountX <= 0 || CountY <= 0 || Width <= 0.0f)
+	{
+		return Points;
+	}
+
+	// 获取样条长度
+	const float SplineLength = SplineComponent->GetSplineLength();
+	if (SplineLength <= 0.0f)
+	{
+		return Points;
+	}
+
+	Points.Reserve(CountX * CountY);
+
+	// 沿样条生成点带
+	for (int32 X = 0; X < CountX; ++X)
+	{
+		// 计算沿样条的进度
+		const float Distance = (static_cast<float>(X) / FMath::Max(1, CountX - 1)) * SplineLength;
+
+		// 获取样条上的位置和方向
+		const FVector SplinePos = SplineComponent->GetLocationAtDistanceAlongSpline(Distance, ESplineCoordinateSpace::World);
+		const FVector SplineRight = SplineComponent->GetRightVectorAtDistanceAlongSpline(Distance, ESplineCoordinateSpace::World);
+
+		// 沿垂直方向生成点
+		for (int32 Y = 0; Y < CountY; ++Y)
+		{
+			// 计算垂直方向的偏移
+			const float OffsetY = (static_cast<float>(Y) / FMath::Max(1, CountY - 1) - 0.5f) * Width;
+
+			FVector Point = SplinePos + SplineRight * OffsetY;
+
+			// 应用噪声
+			if (Noise > 0.0f)
+			{
+				Point = ApplyNoise(Point, Noise);
+			}
+
+			Points.Add(Point);
+		}
+	}
+
+	return Points;
+}
+
+// ============================================================================
+// 纹理像素提取
+// ============================================================================
+
+void USkelotGeometryTools::GetPixelsByTexture(UTexture2D* Texture, int32 SampleStep, TArray<FColor>& OutColors, TArray<FVector2D>& OutUVs)
+{
+	OutColors.Empty();
+	OutUVs.Empty();
+
+	// 参数验证
+	if (!Texture || SampleStep < 1)
+	{
+		return;
+	}
+
+	// 获取纹理尺寸
+	const int32 TextureWidth = Texture->GetSizeX();
+	const int32 TextureHeight = Texture->GetSizeY();
+
+	if (TextureWidth <= 0 || TextureHeight <= 0)
+	{
+		return;
+	}
+
+#if WITH_EDITORONLY_DATA
+	// 在编辑器中，尝试使用平台数据
+	FTexturePlatformData* PlatformData = Texture->GetPlatformData();
+	if (!PlatformData)
+	{
+		return;
+	}
+
+	// 获取 Mip 数据
+	if (PlatformData->Mips.Num() == 0)
+	{
+		return;
+	}
+
+	FTexture2DMipMap& Mip = PlatformData->Mips[0];
+	void* Data = Mip.BulkData.Lock(LOCK_READ_ONLY);
+
+	if (!Data)
+	{
+		Mip.BulkData.Unlock();
+		return;
+	}
+
+	const uint8* PixelData = static_cast<const uint8*>(Data);
+
+	// 假设是 RGBA8 格式
+	const int32 BytesPerPixel = 4;
+
+	// 计算采样后的像素数量
+	const int32 NumSamplesX = FMath::CeilToInt(static_cast<float>(TextureWidth) / SampleStep);
+	const int32 NumSamplesY = FMath::CeilToInt(static_cast<float>(TextureHeight) / SampleStep);
+	const int32 TotalSamples = NumSamplesX * NumSamplesY;
+
+	OutColors.Reserve(TotalSamples);
+	OutUVs.Reserve(TotalSamples);
+
+	// 遍历并采样
+	for (int32 Y = 0; Y < TextureHeight; Y += SampleStep)
+	{
+		for (int32 X = 0; X < TextureWidth; X += SampleStep)
+		{
+			const int32 PixelIndex = (Y * TextureWidth + X) * BytesPerPixel;
+
+			if (PixelIndex + 3 < TextureWidth * TextureHeight * BytesPerPixel)
+			{
+				FColor Color;
+				Color.B = PixelData[PixelIndex + 0];
+				Color.G = PixelData[PixelIndex + 1];
+				Color.R = PixelData[PixelIndex + 2];
+				Color.A = PixelData[PixelIndex + 3];
+
+				OutColors.Add(Color);
+
+				// 计算 UV 坐标 (0-1 范围)
+				FVector2D UV(
+					static_cast<float>(X) / TextureWidth,
+					static_cast<float>(Y) / TextureHeight
+				);
+				OutUVs.Add(UV);
+			}
+		}
+	}
+
+	Mip.BulkData.Unlock();
+#else
+	// 运行时版本 - 需要使用渲染资源
+	const int32 NumSamplesX = FMath::CeilToInt(static_cast<float>(TextureWidth) / SampleStep);
+	const int32 NumSamplesY = FMath::CeilToInt(static_cast<float>(TextureHeight) / SampleStep);
+	const int32 TotalSamples = NumSamplesX * NumSamplesY;
+
+	OutColors.Reserve(TotalSamples);
+	OutUVs.Reserve(TotalSamples);
+
+	// 运行时不直接访问纹理数据，返回占位数据
+	for (int32 Y = 0; Y < TextureHeight; Y += SampleStep)
+	{
+		for (int32 X = 0; X < TextureWidth; X += SampleStep)
+		{
+			OutColors.Add(FColor::Magenta);
+
+			FVector2D UV(
+				static_cast<float>(X) / TextureWidth,
+				static_cast<float>(Y) / TextureHeight
+			);
+			OutUVs.Add(UV);
+		}
+	}
+#endif
 }

@@ -6,6 +6,10 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "SkelotGeometryTools.generated.h"
 
+class UStaticMesh;
+class USplineComponent;
+class UTexture2D;
+
 /**
  * Skelot 几何工具函数库
  * 提供点阵生成功能，用于批量创建实例位置
@@ -66,6 +70,53 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Skelot|几何工具", meta = (DisplayName = "按形状获取点阵"))
 	static TArray<FVector> GetPointsByShape(UPrimitiveComponent* ShapeComponent, float Distance, bool bSurfaceOnly = false, float Noise = 0.0f);
 
+	/**
+	 * 在静态网格表面生成随机点（三角形面积加权采样）
+	 * @param Mesh 静态网格资产
+	 * @param Transform 网格变换
+	 * @param Distance 目标点间距（厘米）
+	 * @param Noise 随机偏移量（厘米），0表示规则排列
+	 * @param LODIndex LOD级别（0为最高）
+	 * @return 点坐标数组
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Skelot|几何工具", meta = (DisplayName = "按网格模型获取表面点"))
+	static TArray<FVector> GetPointsByMesh(UStaticMesh* Mesh, FTransform Transform, float Distance, float Noise = 0.0f, int32 LODIndex = 0);
+
+	/**
+	 * 在静态网格上生成体素化点
+	 * @param Mesh 静态网格资产
+	 * @param Transform 网格变换
+	 * @param VoxelSize 体素大小（厘米）
+	 * @param bSolid true表示实心，false表示外壳
+	 * @param Noise 随机偏移量（厘米）
+	 * @param LODIndex LOD级别（0为最高）
+	 * @return 点坐标数组
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Skelot|几何工具", meta = (DisplayName = "按网格模型获取体素点"))
+	static TArray<FVector> GetPointsByMeshVoxel(UStaticMesh* Mesh, FTransform Transform, float VoxelSize, bool bSolid = false, float Noise = 0.0f, int32 LODIndex = 0);
+
+	/**
+	 * 沿样条曲线生成点带
+	 * @param SplineComponent 样条组件
+	 * @param CountX 沿样条方向点数
+	 * @param CountY 垂直方向点数（形成带状）
+	 * @param Width 带状宽度（厘米）
+	 * @param Noise 随机偏移量（厘米）
+	 * @return 点坐标数组
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Skelot|几何工具", meta = (DisplayName = "按样条曲线获取点阵"))
+	static TArray<FVector> GetPointsBySpline(USplineComponent* SplineComponent, int32 CountX, int32 CountY = 1, float Width = 100.0f, float Noise = 0.0f);
+
+	/**
+	 * 从纹理获取像素数据
+	 * @param Texture 纹理资产
+	 * @param SampleStep 采样步长，1表示全部，3表示每3个取1个
+	 * @param OutColors 输出像素颜色数组
+	 * @param OutUVs 输出像素UV坐标数组
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Skelot|几何工具", meta = (DisplayName = "从纹理获取像素"))
+	static void GetPixelsByTexture(UTexture2D* Texture, int32 SampleStep, TArray<FColor>& OutColors, TArray<FVector2D>& OutUVs);
+
 private:
 	/**
 	 * 生成圆形填充的偏移坐标（以原点为中心）
@@ -82,4 +133,22 @@ private:
 	 * @return 添加噪声后的点
 	 */
 	static FVector ApplyNoise(const FVector& Point, float Noise);
+
+	/**
+	 * 在三角形内生成随机点（重心坐标采样）
+	 * @param V0 三角形顶点0
+	 * @param V1 三角形顶点1
+	 * @param V2 三角形顶点2
+	 * @return 三角形内的随机点
+	 */
+	static FVector GetRandomPointInTriangle(const FVector& V0, const FVector& V1, const FVector& V2);
+
+	/**
+	 * 计算三角形面积
+	 * @param V0 三角形顶点0
+	 * @param V1 三角形顶点1
+	 * @param V2 三角形顶点2
+	 * @return 三角形面积
+	 */
+	static float GetTriangleArea(const FVector& V0, const FVector& V1, const FVector& V2);
 };

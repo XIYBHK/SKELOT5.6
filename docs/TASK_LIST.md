@@ -229,20 +229,20 @@
 ### 7.3 Mesh 相关生成
 | 任务 | 优先级 | 状态 | 说明 |
 |------|--------|------|------|
-| GetPointsByMesh - 表面 | P2 | ⬜ | 静态网格表面随机点，支持 LODIndex |
-| 三角形面积加权采样 | P2 | ⬜ | 表面均匀分布算法 |
-| GetPointsByMeshVoxel - 外壳 | P2 | ⬜ | 体素化外壳 |
-| GetPointsByMeshVoxel - 实心 | P2 | ⬜ | 体素化实心 |
+| GetPointsByMesh - 表面 | P2 | ✅ | 静态网格表面随机点，支持 LODIndex |
+| 三角形面积加权采样 | P2 | ✅ | 表面均匀分布算法 |
+| GetPointsByMeshVoxel - 外壳 | P2 | ✅ | 体素化外壳 |
+| GetPointsByMeshVoxel - 实心 | P2 | ✅ | 体素化实心 |
 
 ### 7.4 Spline 相关生成
 | 任务 | 优先级 | 状态 | 说明 |
 |------|--------|------|------|
-| GetPointsBySpline | P2 | ⬜ | 沿样条曲线生成点带 |
+| GetPointsBySpline | P2 | ✅ | 沿样条曲线生成点带 |
 
 ### 7.5 纹理采样
 | 任务 | 优先级 | 状态 | 说明 |
 |------|--------|------|------|
-| GetPixelsByTexture | P2 | ⬜ | 从纹理获取像素数据 |
+| GetPixelsByTexture | P2 | ✅ | 从纹理获取像素数据 |
 
 ---
 
@@ -332,10 +332,10 @@ git commit -m "feat(Ed): 实现编辑器扩展 - 右键菜单资产创建功能
 | Phase 4: PBD 系统 | 16 | 14 | 88% |
 | Phase 5: RVO 系统 | 18 | 17 | 94% |
 | Phase 6: LOD 系统 | 6 | 6 | 100% |
-| Phase 7: 几何工具 | 14 | 5 | 36% |
+| Phase 7: 几何工具 | 14 | 11 | 79% |
 | Phase 8: 编辑器 | 7 | 6 | 86% |
 | Phase 9: 示例文档 | 7 | 3 | 43% |
-| **总计** | **108** | **86** | **80%** |
+| **总计** | **108** | **92** | **85%** |
 
 ---
 
@@ -360,6 +360,7 @@ git commit -m "feat(Ed): 实现编辑器扩展 - 右键菜单资产创建功能
 
 | 日期 | 更新内容 |
 |------|----------|
+| 2026-03-02 | 完成 Phase 7 几何工具库剩余功能：GetPointsByMesh（静态网格表面点+三角形面积加权采样）、GetPointsByMeshVoxel（体素化外壳/实心）、GetPointsBySpline（样条曲线点带）、GetPixelsByTexture（纹理像素提取），Mesh/Voxel 功能仅编辑器可用 |
 | 2026-03-02 | 完成 Phase 9.1 示例关卡 Actor 类：ASkelotExampleBasicInstance（基础实例创建/销毁/动画）、ASkelotExampleCollisionAvoidance（PBD+RVO碰撞避让）、ASkelotExampleGeometryTools（几何工具点位生成），支持键盘交互演示各功能，添加 InputCore 模块依赖 |
 | 2026-03-02 | 完成 Phase 4.3 障碍物系统：SkelotSphereObstacle（球形障碍物）、SkelotBoxObstacle（盒形障碍物）、障碍物与实例碰撞检测，创建 ASkelotObstacle 基类和派生类，在 FSkelotPBDCollisionSystem 中添加 SolveObstacleCollisions 方法，在 ASkelotWorld 中添加障碍物注册/注销/查询 API |
 | 2026-03-02 | 完成 Phase 3.2 盒形范围查询：QueryLocationOverlappingBox/QueryLocationOverlappingBoxWithMask，支持空间网格优化和掩码过滤，在 ASkelotWorld 和 USkelotWorldSubsystem 中添加完整 API |
