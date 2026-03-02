@@ -142,9 +142,9 @@
 | 任务 | 优先级 | 状态 | 说明 |
 |------|--------|------|------|
 | SkelotPBDPlane Actor | P0 | ✅ | 场景配置 Actor，支持 PBD/RVO/抗抖动参数配置 |
-| SkelotSphereObstacle | P1 | ⬜ | 球形障碍物 |
-| SkelotBoxObstacle | P1 | ⬜ | 盒形障碍物 |
-| 障碍物与实例碰撞 | P1 | ⬜ | 实例避开障碍物 |
+| SkelotSphereObstacle | P1 | ✅ | 球形障碍物 |
+| SkelotBoxObstacle | P1 | ✅ | 盒形障碍物 |
+| 障碍物与实例碰撞 | P1 | ✅ | 实例避开障碍物 |
 
 ### 4.4 技术调研
 | 任务 | 状态 | 说明 |
@@ -329,13 +329,13 @@ git commit -m "feat(Ed): 实现编辑器扩展 - 右键菜单资产创建功能
 | Phase 2: 碰撞通道 | 10 | 10 | 100% |
 | Phase 2.5: 层级关系 | 4 | 4 | 100% |
 | Phase 3: 空间检测 | 13 | 8 | 62% |
-| Phase 4: PBD 系统 | 16 | 11 | 69% |
+| Phase 4: PBD 系统 | 16 | 14 | 88% |
 | Phase 5: RVO 系统 | 18 | 17 | 94% |
 | Phase 6: LOD 系统 | 6 | 6 | 100% |
 | Phase 7: 几何工具 | 14 | 5 | 36% |
 | Phase 8: 编辑器 | 7 | 6 | 86% |
 | Phase 9: 示例文档 | 7 | 0 | 0% |
-| **总计** | **108** | **80** | **74%** |
+| **总计** | **108** | **83** | **77%** |
 
 ---
 
@@ -360,6 +360,7 @@ git commit -m "feat(Ed): 实现编辑器扩展 - 右键菜单资产创建功能
 
 | 日期 | 更新内容 |
 |------|----------|
+| 2026-03-02 | 完成 Phase 4.3 障碍物系统：SkelotSphereObstacle（球形障碍物）、SkelotBoxObstacle（盒形障碍物）、障碍物与实例碰撞检测，创建 ASkelotObstacle 基类和派生类，在 FSkelotPBDCollisionSystem 中添加 SolveObstacleCollisions 方法，在 ASkelotWorld 中添加障碍物注册/注销/查询 API |
 | 2026-03-02 | 完成 Phase 3.2 盒形范围查询：QueryLocationOverlappingBox/QueryLocationOverlappingBoxWithMask，支持空间网格优化和掩码过滤，在 ASkelotWorld 和 USkelotWorldSubsystem 中添加完整 API |
 | 2026-03-02 | 完成 Phase 8.2 调试工具：控制台命令(Skelot.DrawAllBounds/DrawSpatialGrid/DrawCollisionRadius/DrawVelocities/DrawNeighborLinks/Stats)、调试绘制(实例包围盒/空间网格/碰撞半径/速度向量/邻居连接线)、统计信息(实例数/更新时间/邻居密度)，创建 FSkelotDebugTools 类 |
 | 2026-03-02 | 完成 Phase 8.1 快速资产创建：右键菜单扩展、自动创建 AnimCollection、自动创建 RenderParams，创建 FSkelotAssetTypeActions_SkeletalMesh 类实现内容浏览器右键菜单扩展 |

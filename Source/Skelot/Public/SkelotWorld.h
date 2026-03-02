@@ -10,6 +10,7 @@
 #include "SkelotWorld.generated.h"
 
 enum class ESkelotClusterMode : uint8;
+class ASkelotObstacle;
 
 /*
 Skelot Singleton Actor, spawned automatically if not already in the world. (you may need to edit default properties ).
@@ -139,6 +140,17 @@ public:
 
         // 相机位置缓存（用于 LOD 距离计算）
         FVector CachedCameraLocation = FVector::ZeroVector;
+
+        //////////////////////////////////////////////////////////////////////////
+        // Obstacle System
+        // 障碍物系统 - PBD 碰撞的静态障碍物
+
+        // 已注册的障碍物列表
+        UPROPERTY(Transient)
+        TArray<TObjectPtr<ASkelotObstacle>> RegisteredObstacles;
+
+        // 障碍物缓存是否需要更新
+        bool bObstaclesDirty = true;
 
         DECLARE_DELEGATE_ThreeParams(FOnWorldActorTick, ASkelotWorld*, ELevelTick, float);
 	//
@@ -672,6 +684,59 @@ public:
 	 * @return 0=近（每帧）, 1=中（每2帧）, 2=远（每4帧）
 	 */
 	int32 GetInstanceLODLevel(int32 InstanceIndex) const;
+
+	//////////////////////////////////////////////////////////////////////////
+	// Obstacle API
+	// 障碍物系统 API - PBD 碰撞的静态障碍物管理
+
+	/**
+	 * 注册障碍物到 SkelotWorld
+	 * @param Obstacle 要注册的障碍物
+	 */
+	void RegisterObstacle(ASkelotObstacle* Obstacle);
+
+	/**
+	 * 从 SkelotWorld 注销障碍物
+	 * @param Obstacle 要注销的障碍物
+	 */
+	void UnregisterObstacle(ASkelotObstacle* Obstacle);
+
+	/**
+	 * 获取所有已注册的障碍物
+	 * @return 障碍物数组
+	 */
+	const TArray<TObjectPtr<ASkelotObstacle>>& GetRegisteredObstacles() const { return RegisteredObstacles; }
+
+	/**
+	 * 获取有效障碍物数量
+	 * @return 有效障碍物数量
+	 */
+	int32 GetNumObstacles() const { return RegisteredObstacles.Num(); }
+
+	/**
+	 * 标记障碍物缓存需要更新
+	 * 在障碍物属性变化时调用
+	 */
+	void MarkObstaclesDirty() { bObstaclesDirty = true; }
+
+	/**
+	 * 查询位置附近的障碍物
+	 * @param Location 查询位置
+	 * @param Radius 查询半径
+	 * @param OutObstacles 输出障碍物数组
+	 */
+	void QueryObstaclesNearLocation(const FVector& Location, float Radius, TArray<ASkelotObstacle*>& OutObstacles) const;
+
+	/**
+	 * 检查实例是否与任何障碍物碰撞，并计算碰撞响应
+	 * @param InstanceLocation 实例位置
+	 * @param InstanceRadius 实例碰撞半径
+	 * @param InstanceCollisionMask 实例碰撞掩码
+	 * @param OutCorrection 输出位置校正量
+	 * @return true 如果与任何障碍物碰撞
+	 */
+	bool ComputeObstacleCollision(const FVector& InstanceLocation, float InstanceRadius, uint8 InstanceCollisionMask,
+								  FVector& OutCorrection) const;
 
 	void RemoveInvalidHandles(bool bMaintainOrder, TArray<FSkelotInstanceHandle>& InOutHandles);
 	//function to get handles of all the valid instances

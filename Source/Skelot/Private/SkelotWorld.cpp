@@ -5,6 +5,7 @@
 #include "SkelotSubsystem.h"
 #include "SkelotPrivate.h"
 #include "SkelotRVOSystem.h"
+#include "SkelotObstacle.h"
 #include "SkelotAnimCollection.h"
 #include "SkelotPrivateUtils.h"
 #include "Rendering/SkeletalMeshRenderData.h"
@@ -2305,8 +2306,20 @@ void ASkelotWorld::SolvePBDCollisions(float DeltaTime)
 	}
 	PBDUpdateFrameCounter = 0;
 
-	// 执行PBD碰撞求解
+	// 执行PBD碰撞求解（实例间碰撞）
 	PBDCollisionSystem.SolveCollisions(SOA, GetNumInstance(), SpatialGrid, DeltaTime);
+
+	// 执行障碍物碰撞求解
+	if (RegisteredObstacles.Num() > 0)
+	{
+		PBDCollisionSystem.SolveObstacleCollisions(SOA, GetNumInstance(), RegisteredObstacles);
+
+		// 如果有障碍物碰撞，执行额外迭代以提高稳定性
+		for (int32 i = 0; i < PBDConfig.PostObstacleIterations; i++)
+		{
+			PBDCollisionSystem.SolveObstacleCollisions(SOA, GetNumInstance(), RegisteredObstacles);
+		}
+	}
 }
 
 void ASkelotWorld::SetRVOConfig(const FSkelotRVOConfig& InConfig)
@@ -2414,6 +2427,105 @@ int32 ASkelotWorld::GetInstanceLODLevel(int32 InstanceIndex) const
 	{
 		return 2; // 远距离
 	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Obstacle System Implementation
+///////////////////////////////////////////////////////////////////////////////
+
+void ASkelotWorld::RegisterObstacle(ASkelotObstacle* Obstacle)
+{
+	if (!Obstacle)
+	{
+		return;
+	}
+
+	// 检查是否已经注册
+	if (RegisteredObstacles.Contains(Obstacle))
+	{
+		return;
+	}
+
+	RegisteredObstacles.Add(Obstacle);
+	bObstaclesDirty = true;
+
+	UE_LOG(LogTemp, Verbose, TEXT("ASkelotWorld::RegisterObstacle - Registered obstacle: %s"), *Obstacle->GetName());
+}
+
+void ASkelotWorld::UnregisterObstacle(ASkelotObstacle* Obstacle)
+{
+	if (!Obstacle)
+	{
+		return;
+	}
+
+	int32 RemovedCount = RegisteredObstacles.Remove(Obstacle);
+	if (RemovedCount > 0)
+	{
+		bObstaclesDirty = true;
+		UE_LOG(LogTemp, Verbose, TEXT("ASkelotWorld::UnregisterObstacle - Unregistered obstacle: %s"), *Obstacle->GetName());
+	}
+}
+
+void ASkelotWorld::QueryObstaclesNearLocation(const FVector& Location, float Radius, TArray<ASkelotObstacle*>& OutObstacles) const
+{
+	OutObstacles.Empty();
+
+	float RadiusSq = Radius * Radius;
+
+	for (const TObjectPtr<ASkelotObstacle>& ObstaclePtr : RegisteredObstacles)
+	{
+		if (!ObstaclePtr.Get() || !ObstaclePtr->bEnabled)
+		{
+			continue;
+		}
+
+		// 简单的距离检查（使用障碍物的等效半径）
+		float ObstacleRadius = ObstaclePtr->GetObstacleRadius();
+		FVector ObstacleLocation = ObstaclePtr->GetActorLocation();
+
+		float DistSq = FVector::DistSquared(Location, ObstacleLocation);
+		float CombinedRadiusSq = FMath::Square(Radius + ObstacleRadius);
+
+		if (DistSq <= CombinedRadiusSq)
+		{
+			OutObstacles.Add(ObstaclePtr);
+		}
+	}
+}
+
+bool ASkelotWorld::ComputeObstacleCollision(const FVector& InstanceLocation, float InstanceRadius, uint8 InstanceCollisionMask,
+											FVector& OutCorrection) const
+{
+	OutCorrection = FVector::ZeroVector;
+
+	bool bAnyCollision = false;
+
+	for (const TObjectPtr<ASkelotObstacle>& ObstaclePtr : RegisteredObstacles)
+	{
+		if (!ObstaclePtr.Get() || !ObstaclePtr->bEnabled)
+		{
+			continue;
+		}
+
+		// 检查碰撞掩码
+		if ((InstanceCollisionMask & ObstaclePtr->CollisionMask) == 0)
+		{
+			continue;
+		}
+
+		FVector PushDirection;
+		float PushMagnitude;
+
+		if (ObstaclePtr->ComputeCollisionResponse(InstanceLocation, InstanceRadius, PushDirection, PushMagnitude))
+		{
+			// 累加推力
+			OutCorrection += PushDirection * PushMagnitude;
+			bAnyCollision = true;
+		}
+	}
+
+	return bAnyCollision;
 }
 
 void ASkelotWorld::RemoveInvalidHandles(bool bMaintainOrder, TArray<FSkelotInstanceHandle>& InOutHandles)

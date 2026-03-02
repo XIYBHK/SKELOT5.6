@@ -7,6 +7,8 @@
 
 #include "SkelotPBDCollision.generated.h"
 
+class ASkelotObstacle;
+
 /**
  * PBD 碰撞系统配置参数
  *
@@ -132,6 +134,15 @@ public:
 	 */
 	void SolveIteration(FSkelotInstancesSOA& SOA, int32 NumInstances,
 						const FSkelotSpatialGrid& SpatialGrid);
+
+	/**
+	 * 执行障碍物碰撞求解
+	 * @param SOA 实例数据数组
+	 * @param NumInstances 实例总数
+	 * @param Obstacles 障碍物数组
+	 */
+	void SolveObstacleCollisions(FSkelotInstancesSOA& SOA, int32 NumInstances,
+								 const TArray<TObjectPtr<ASkelotObstacle>>& Obstacles);
 
 	/** 获取统计信息：处理的碰撞对数量 */
 	int32 GetProcessedCollisionPairs() const { return ProcessedCollisionPairs; }

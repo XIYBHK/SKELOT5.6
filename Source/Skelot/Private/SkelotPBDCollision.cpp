@@ -2,6 +2,8 @@
 
 #include "SkelotPBDCollision.h"
 #include "SkelotSpatialGrid.h"
+#include "SkelotObstacle.h"
+#include "SkelotWorld.h"
 
 FSkelotPBDCollisionSystem::FSkelotPBDCollisionSystem()
 	: Config(FSkelotPBDConfig::GetRecommendedConfig())
@@ -236,6 +238,57 @@ void FSkelotPBDCollisionSystem::SolveIteration(FSkelotInstancesSOA& SOA, int32 N
 
 			// TODO: 如果需要，可以在这里调用速度投影
 			// ApplyVelocityProjection(SOA, i, Correction, DeltaTime);
+		}
+	}
+}
+
+void FSkelotPBDCollisionSystem::SolveObstacleCollisions(FSkelotInstancesSOA& SOA, int32 NumInstances,
+														 const TArray<TObjectPtr<ASkelotObstacle>>& Obstacles)
+{
+	if (Obstacles.Num() == 0)
+	{
+		return;
+	}
+
+	// 遍历所有实例，处理与障碍物的碰撞
+	for (int32 InstanceIndex = 0; InstanceIndex < NumInstances; InstanceIndex++)
+	{
+		// 跳过已销毁的实例
+		if (SOA.Slots[InstanceIndex].bDestroyed)
+		{
+			continue;
+		}
+
+		FVector InstanceLocation(SOA.Locations[InstanceIndex]);
+		float InstanceRadius = Config.CollisionRadius;
+		uint8 InstanceCollisionMask = SOA.CollisionMasks[InstanceIndex];
+
+		// 遍历所有障碍物
+		for (const TObjectPtr<ASkelotObstacle>& ObstaclePtr : Obstacles)
+		{
+			if (!ObstaclePtr.Get() || !ObstaclePtr->bEnabled)
+			{
+				continue;
+			}
+
+			// 检查碰撞掩码
+			if ((InstanceCollisionMask & ObstaclePtr->CollisionMask) == 0)
+			{
+				continue;
+			}
+
+			FVector PushDirection;
+			float PushMagnitude;
+
+			if (ObstaclePtr->ComputeCollisionResponse(InstanceLocation, InstanceRadius, PushDirection, PushMagnitude))
+			{
+				// 应用位置校正（使用松弛系数）
+				FVector3f Correction = FVector3f(PushDirection * PushMagnitude * Config.RelaxationFactor);
+				SOA.Locations[InstanceIndex] += FVector3d(Correction);
+
+				// 更新统计
+				TotalCorrection += Correction.Size();
+			}
 		}
 	}
 }
