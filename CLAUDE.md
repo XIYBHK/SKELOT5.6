@@ -174,6 +174,26 @@ SKELOT_WITH_GPUSCENE=1
 
 详细开发注意事项见 `docs/DEV_NOTES.md`，关键规则如下：
 
+### UE API 问题定位
+
+遇到 UE 内置 API 编译错误时，按以下流程定位：
+
+```
+1. 尝试 context7 MCP 查询 API 文档
+     ↓
+2. 查无结果 → 查看 UE 源码
+     ↓
+3. 根据源码确定正确的 API 用法
+```
+
+**UE 源码位置**：`D:\UE\UE_5.6\Engine\Source`
+
+常用模块路径：
+- Runtime/Core: 核心类型（FVector, TArray 等）
+- Runtime/Engine: 引擎核心（Actor, Component 等）
+- Runtime/Renderer: 渲染相关
+- Runtime/Slate: UI 框架
+
 ### 工具使用
 
 1. **Edit 工具必须先 Read** - 编辑任何文件前必须先使用 Read 工具读取，否则会报错
