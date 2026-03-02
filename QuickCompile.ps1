@@ -11,6 +11,16 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 # 获取脚本所在目录（插件根目录）
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
+# 加载本地环境配置
+$LocalEnvFile = Join-Path $ScriptDir "local.env.ps1"
+if (Test-Path $LocalEnvFile) {
+    . $LocalEnvFile
+}
+
+# UE 路径（优先使用环境变量，否则使用默认值）
+$UEPath = if ($env:UE_PATH) { $env:UE_PATH } else { "F:\Epic Games\UE_5.6" }
+$UATPath = "$UEPath\Engine\Build\BatchFiles\RunUAT.bat"
+
 # 自动查找 .uplugin 文件
 $PluginFile = Get-ChildItem -Path $ScriptDir -Filter "*.uplugin" -File | Select-Object -First 1
 
@@ -20,10 +30,6 @@ if (-not $PluginFile) {
 }
 
 $PluginName = $PluginFile.BaseName
-
-# UE 路径
-$UEPath = "F:\Epic Games\UE_5.6"
-$UATPath = "$UEPath\Engine\Build\BatchFiles\RunUAT.bat"
 
 # 临时输出目录（编译后删除）
 $TempOutput = Join-Path $env:TEMP "Skelot_QuickCompile_$([guid]::NewGuid().ToString())"

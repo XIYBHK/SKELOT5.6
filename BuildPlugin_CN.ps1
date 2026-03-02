@@ -9,6 +9,17 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 # 获取脚本所在目录（插件根目录）
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
+# 加载本地环境配置
+$LocalEnvFile = Join-Path $ScriptDir "local.env.ps1"
+if (Test-Path $LocalEnvFile) {
+    . $LocalEnvFile
+}
+
+# UE 和 VS 路径（优先使用环境变量，否则使用默认值）
+$UEPath = if ($env:UE_PATH) { $env:UE_PATH } else { "F:\Epic Games\UE_5.6" }
+$UATPath = "$UEPath\Engine\Build\BatchFiles\RunUAT.bat"
+$VS2022Path = if ($env:VS2022_PATH) { $env:VS2022_PATH } else { "E:\VisualStudio\2022\Common7\IDE" }
+
 # 自动查找 .uplugin 文件
 $PluginFile = Get-ChildItem -Path $ScriptDir -Filter "*.uplugin" -File | Select-Object -First 1
 
@@ -28,11 +39,6 @@ if (-not $PluginFile) {
 $PluginName = $PluginFile.BaseName
 $PluginPath = $PluginFile.FullName
 $OutputPath = Join-Path (Split-Path -Parent $ScriptDir) "CompiledPlugin"
-
-# UE 和 VS 路径（可根据需要修改）
-$UEPath = "F:\Epic Games\UE_5.6"
-$UATPath = "$UEPath\Engine\Build\BatchFiles\RunUAT.bat"
-$VS2022Path = "E:\VisualStudio\2022\Common7\IDE"
 
 function Show-Header {
     Write-Host "========================================" -ForegroundColor Cyan

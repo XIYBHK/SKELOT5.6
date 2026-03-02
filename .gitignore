@@ -75,3 +75,6 @@ Desktop.ini
 *.rar
 *.7z
 *.tar.gz
+
+# Local environment config
+local.env.ps1
