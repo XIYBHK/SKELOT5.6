@@ -2,9 +2,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": {
-          "toolName": "Bash"
-        },
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
@@ -15,14 +13,11 @@
     ],
     "PostToolUse": [
       {
-        "matcher": {
-          "toolName": "Bash",
-          "commandContains": "git commit"
-        },
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "echo '[提醒] 提交完成! 请检查 docs/DEV_NOTES.md 是否已记录本次遇到的问题和解决方案'"
+            "command": "bash -c 'INPUT=$(cat); COMMAND=$(echo \"$INPUT\" | jq -r \".tool_input.command // empty\"); if echo \"$COMMAND\" | grep -q \"git commit\"; then echo \"[提醒] 提交完成! 请检查 docs/DEV_NOTES.md 是否已记录本次遇到的问题和解决方案\"; fi'"
           }
         ]
       }

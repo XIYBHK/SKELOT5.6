@@ -163,7 +163,7 @@
 | 实现速度障碍(VO)计算 | P0 | ✅ | 锥形速度区域，ComputeORCAPlane 实现 |
 | 实现互惠速度障碍(RVO) | P0 | ✅ | 共享避障责任，半平面交集 |
 | 实现 ORCA 线性约束 | P0 | ✅ | LinearProgram/LinearProgram1/2/3 实现 |
-| 实现 HRVO 混合模式 | P2 | ⬜ | 结合 RVO 和 VO 优势 |
+| 实现 HRVO 混合模式 | P2 | ✅ | 结合 RVO 和 VO 优势，ComputeHRVOPlane/IsHeadOnCollision/ComputeRVOPlane/ComputeVOPlane |
 
 ### 5.2 RVO 配置参数
 | 任务 | 优先级 | 状态 | 默认值 |
@@ -330,12 +330,12 @@ git commit -m "feat(Ed): 实现编辑器扩展 - 右键菜单资产创建功能
 | Phase 2.5: 层级关系 | 4 | 4 | 100% |
 | Phase 3: 空间检测 | 13 | 9 | 69% |
 | Phase 4: PBD 系统 | 16 | 14 | 88% |
-| Phase 5: RVO 系统 | 18 | 17 | 94% |
+| Phase 5: RVO 系统 | 18 | 18 | 100% |
 | Phase 6: LOD 系统 | 6 | 6 | 100% |
 | Phase 7: 几何工具 | 14 | 11 | 79% |
 | Phase 8: 编辑器 | 7 | 6 | 86% |
 | Phase 9: 示例文档 | 7 | 7 | 100% |
-| **总计** | **108** | **97** | **90%** |
+| **总计** | **108** | **98** | **91%** |
 
 ---
 
@@ -360,6 +360,7 @@ git commit -m "feat(Ed): 实现编辑器扩展 - 右键菜单资产创建功能
 
 | 日期 | 更新内容 |
 |------|----------|
+| 2026-03-02 | 完成 Phase 5.1 HRVO 混合模式：ComputeHRVOPlane（迎面检测+VO/RVO选择）、IsHeadOnCollision（迎面碰撞检测）、ComputeRVOPlane（互惠避障）、ComputeVOPlane（单方避障），新增配置参数 bEnableHRVO 和 HRVOHeadOnThreshold |
 | 2026-03-02 | 完成 Phase 9.2 文档更新：创建 API_REFERENCE.md（完整 API 参考文档，10个模块 50+ API 说明）、CONFIGURATION.md（PBD/RVO 配置参数指南，推荐配置表，调试建议） |
 | 2026-03-02 | 完成 Phase 9.1 性能测试关卡：ASkelotExampleStressTest Actor，支持 4-5w 实例压力测试，FPS/帧时间统计，HUD 显示，四种测试模式（静态/移动/移动+PBD/移动+PBD+RVO），键盘交互控制 |
 | 2026-03-02 | 完成 Phase 7 几何工具库剩余功能：GetPointsByMesh（静态网格表面点+三角形面积加权采样）、GetPointsByMeshVoxel（体素化外壳/实心）、GetPointsBySpline（样条曲线点带）、GetPixelsByTexture（纹理像素提取），Mesh/Voxel 功能仅编辑器可用 |

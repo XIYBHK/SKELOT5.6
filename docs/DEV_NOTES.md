@@ -693,4 +693,59 @@ static FAutoConsoleVariableRef CVarDebugMode(
 
 ---
 
+## HRVO 混合避障模式实现 (2026-03-02)
+
+### 功能说明
+
+HRVO (Hybrid Reciprocal Velocity Obstacle) 结合了 RVO 和 VO 的优点：
+- **RVO**：双方各承担一半避障责任，适用于大多数情况
+- **VO**：一方承担全部避障责任，适用于迎面相遇场景
+- **HRVO**：根据情况自动选择 RVO 或 VO
+
+### 实现的函数
+
+| 函数 | 说明 |
+|------|------|
+| `ComputeHRVOPlane` | HRVO 主入口，检测迎面相遇并选择算法 |
+| `IsHeadOnCollision` | 检测是否迎面相遇（点积 < 阈值） |
+| `ComputeRVOPlane` | 标准 RVO 算法，速度障碍分半 |
+| `ComputeVOPlane` | 标准 VO 算法，速度障碍不分半 |
+
+### 配置参数
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `bEnableHRVO` | false | 是否启用 HRVO 混合模式 |
+| `HRVOHeadOnThreshold` | -0.5f | 迎面检测阈值（负值，越小越严格） |
+
+### 緻加位置
+- 配置参数：`SkelotPBDPlane.h` 的 `FSkelotRVOConfig` 结构体
+- 函数声明：`SkelotRVOSystem.h`
+- 函数实现：`SkelotRVOSystem.cpp`
+
+### 算法原理
+```cpp
+// 迎面检测：相对位置与相对速度方向相反
+bool IsHeadOnCollision(RelPos, RelVel)
+{
+    float Dot = dot(normalize(RelPos), normalize(RelVel));
+    return Dot < Threshold;  // 负值表示方向相反
+}
+
+// HRVO 主逻辑
+void ComputeHRVOPlane(...)
+{
+    if (IsHeadOnCollision(...))
+    {
+        ComputeVOPlane(...);  // 迎面：一方全责
+    }
+    else
+    {
+        ComputeRVOPlane(...);  // 非迎面：双方共担
+    }
+}
+```
+
+---
+
 *最后更新: 2026-03-02*

@@ -55,6 +55,14 @@ struct FSkelotRVOConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO", meta = (ClampMin = "1", ClampMax = "4"))
 	int32 FrameStride = 1;
 
+	/** 是否启用HRVO混合模式 - 结合RVO和VO的优点，解决迎面相遇时的振荡问题 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO")
+	bool bEnableHRVO = false;
+
+	/** HRVO迎面检测阈值 - 当相对速度与相对位置方向相反程度超过此值时使用VO */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO", meta = (ClampMin = "-1.0", ClampMax = "0.0"))
+	float HRVOHeadOnThreshold = -0.5f;
+
 	/** 默认构造 */
 	FSkelotRVOConfig() = default;
 
@@ -71,6 +79,8 @@ struct FSkelotRVOConfig
 		Config.ArrivalDensityThreshold = 6;
 		Config.MaxNeighbors = 16;
 		Config.FrameStride = 1;
+		Config.bEnableHRVO = false;
+		Config.HRVOHeadOnThreshold = -0.5f;
 		return Config;
 	}
 };

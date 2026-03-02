@@ -185,6 +185,67 @@ private:
 						  FORCAPlane& OutPlane);
 
 	/**
+	 * 计算 HRVO 平面（混合 RVO 和 VO）
+	 *
+	 * 当两个代理迎面相遇时使用 VO，其他情况使用 RVO
+	 * 解决了 RVO 在迎面相遇时可能出现的振荡问题
+	 *
+	 * @param PosA 实例A位置
+	 * @param VelA 实例A速度
+	 * @param PosB 实例B位置
+	 * @param VelB 实例B速度
+	 * @param CombinedRadius 组合半径
+	 * @param OutPlane 输出平面
+	 */
+	void ComputeHRVOPlane(const FVector3f& PosA, const FVector3f& VelA,
+						  const FVector3f& PosB, const FVector3f& VelB,
+						  float CombinedRadius,
+						  FORCAPlane& OutPlane);
+
+	/**
+	 * 检测两个代理是否迎面相遇
+	 *
+	 * @param RelativePosition 相对位置 (B - A)
+	 * @param RelativeVelocity 相对速度 (A - B)
+	 * @return true 如果是迎面相遇
+	 */
+	bool IsHeadOnCollision(const FVector2f& RelativePosition, const FVector2f& RelativeVelocity) const;
+
+	/**
+	 * 计算 RVO 平面（互惠速度障碍）
+	 *
+	 * 双方各承担一半避障责任
+	 *
+	 * @param PosA 实例A位置
+	 * @param VelA 实例A速度
+	 * @param PosB 实例B位置
+	 * @param VelB 实例B速度
+	 * @param CombinedRadius 组合半径
+	 * @param OutPlane 输出平面
+	 */
+	void ComputeRVOPlane(const FVector3f& PosA, const FVector3f& VelA,
+						 const FVector3f& PosB, const FVector3f& VelB,
+						 float CombinedRadius,
+						 FORCAPlane& OutPlane);
+
+	/**
+	 * 计算 VO 平面（标准速度障碍）
+	 *
+	 * 一方承担全部避障责任
+	 *
+	 * @param PosA 实例A位置
+	 * @param VelA 实例A速度
+	 * @param PosB 实例B位置
+	 * @param VelB 实例B速度
+	 * @param CombinedRadius 组合半径
+	 * @param OutPlane 输出平面
+	 */
+	void ComputeVOPlane(const FVector3f& PosA, const FVector3f& VelA,
+						const FVector3f& PosB, const FVector3f& VelB,
+						float CombinedRadius,
+						FORCAPlane& OutPlane);
+
+	/**
 	 * 线性规划求解 - 找到满足所有约束的最优速度
 	 *
 	 * @param Planes ORCA 平面数组
