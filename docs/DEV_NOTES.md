@@ -500,12 +500,27 @@ static FAutoConsoleVariableRef CVarDebugMode(
 
    **问题**：`FRawStaticIndexBuffer::GetIndex32/GetIndex16` 和 `GetDataTypeSize()` 在 UE5.6 中不存在
 
-   **解决方案**：改用 `FStaticMeshSection` 遍历三角形，直接用 Section.FirstIndex 作为顶点索引
+   **源码定位**：`D:\UE\UE_5.6\Engine\Source\Runtime\Engine\Public\RawIndexBuffer.h`
+   - `FRawStaticIndexBuffer::GetIndex(uint32 At)` - 获取单个索引
+   - `FRawStaticIndexBuffer::GetArrayView()` - 获取 FIndexArrayView 视图
+   - `FRawStaticIndexBuffer::Is32Bit()` - 判断是否 32 位
+
+   **错误做法**：直接用 `Section.FirstIndex` 作为顶点索引
    ```cpp
+   // 错误：FirstIndex 是索引缓冲偏移，不是顶点索引
+   FVector V0 = PositionBuffer.VertexPosition(Section.FirstIndex);
+   ```
+
+   **正确做法**：通过索引缓冲获取真正的顶点索引
+   ```cpp
+   FIndexArrayView IndexArrayView = IndexBuffer.GetArrayView();
    for (uint32 TriIdx = 0; TriIdx < Section.NumTriangles; ++TriIdx)
    {
-       const uint32 BaseIndex = Section.FirstIndex + TriIdx * 3;
-       FVector V0 = FVector(PositionBuffer.VertexPosition(BaseIndex));
+       const uint32 IndexBase = Section.FirstIndex + TriIdx * 3;
+       const uint32 Vtx0 = IndexArrayView[IndexBase];     // 真正的顶点索引
+       const uint32 Vtx1 = IndexArrayView[IndexBase + 1];
+       const uint32 Vtx2 = IndexArrayView[IndexBase + 2];
+       FVector V0 = FVector(PositionBuffer.VertexPosition(Vtx0));
        // ...
    }
    ```

@@ -542,10 +542,17 @@ TArray<FVector> USkelotGeometryTools::GetPointsByMesh(UStaticMesh* Mesh, FTransf
 	const FPositionVertexBuffer& PositionBuffer = LODResources.VertexBuffers.PositionVertexBuffer;
 	const uint32 NumVertices = PositionBuffer.GetNumVertices();
 
-	if (NumVertices == 0)
+	// 获取索引缓冲
+	const FRawStaticIndexBuffer& IndexBuffer = LODResources.IndexBuffer;
+	const int32 NumIndices = IndexBuffer.GetNumIndices();
+
+	if (NumVertices == 0 || NumIndices == 0)
 	{
 		return Points;
 	}
+
+	// 获取索引数组视图
+	FIndexArrayView IndexArrayView = IndexBuffer.GetArrayView();
 
 	// 收集所有三角形顶点
 	TArray<FVector> AllTriangles;
@@ -564,24 +571,37 @@ TArray<FVector> USkelotGeometryTools::GetPointsByMesh(UStaticMesh* Mesh, FTransf
 		// 遍历 Section 中的三角形
 		for (uint32 TriIdx = 0; TriIdx < Section.NumTriangles; ++TriIdx)
 		{
-			const uint32 BaseIndex = Section.FirstIndex + TriIdx * 3;
+			const uint32 IndexBase = Section.FirstIndex + TriIdx * 3;
 
-			// 获取三角形顶点 - 使用顶点索引
-			if (BaseIndex + 2 < NumVertices)
+			// 检查索引范围
+			if (IndexBase + 2 >= (uint32)NumIndices)
 			{
-				FVector V0 = FVector(PositionBuffer.VertexPosition(BaseIndex));
-				FVector V1 = FVector(PositionBuffer.VertexPosition(BaseIndex + 1));
-				FVector V2 = FVector(PositionBuffer.VertexPosition(BaseIndex + 2));
-
-				// 应用变换
-				V0 = Transform.TransformPosition(V0);
-				V1 = Transform.TransformPosition(V1);
-				V2 = Transform.TransformPosition(V2);
-
-				AllTriangles.Add(V0);
-				AllTriangles.Add(V1);
-				AllTriangles.Add(V2);
+				continue;
 			}
+
+			// 通过索引缓冲获取真正的顶点索引
+			const uint32 Vtx0 = IndexArrayView[IndexBase];
+			const uint32 Vtx1 = IndexArrayView[IndexBase + 1];
+			const uint32 Vtx2 = IndexArrayView[IndexBase + 2];
+
+			// 检查顶点索引范围
+			if (Vtx0 >= NumVertices || Vtx1 >= NumVertices || Vtx2 >= NumVertices)
+			{
+				continue;
+			}
+
+			FVector V0 = FVector(PositionBuffer.VertexPosition(Vtx0));
+			FVector V1 = FVector(PositionBuffer.VertexPosition(Vtx1));
+			FVector V2 = FVector(PositionBuffer.VertexPosition(Vtx2));
+
+			// 应用变换
+			V0 = Transform.TransformPosition(V0);
+			V1 = Transform.TransformPosition(V1);
+			V2 = Transform.TransformPosition(V2);
+
+			AllTriangles.Add(V0);
+			AllTriangles.Add(V1);
+			AllTriangles.Add(V2);
 		}
 	}
 
@@ -713,10 +733,17 @@ TArray<FVector> USkelotGeometryTools::GetPointsByMeshVoxel(UStaticMesh* Mesh, FT
 	const FPositionVertexBuffer& PositionBuffer = LODResources.VertexBuffers.PositionVertexBuffer;
 	const uint32 NumVertices = PositionBuffer.GetNumVertices();
 
-	if (NumVertices == 0)
+	// 获取索引缓冲
+	const FRawStaticIndexBuffer& IndexBuffer = LODResources.IndexBuffer;
+	const int32 NumIndices = IndexBuffer.GetNumIndices();
+
+	if (NumVertices == 0 || NumIndices == 0)
 	{
 		return Points;
 	}
+
+	// 获取索引数组视图
+	FIndexArrayView IndexArrayView = IndexBuffer.GetArrayView();
 
 	// 使用 Section 遍历
 	const int32 NumSections = LODResources.Sections.Num();
@@ -731,22 +758,36 @@ TArray<FVector> USkelotGeometryTools::GetPointsByMeshVoxel(UStaticMesh* Mesh, FT
 
 		for (uint32 TriIdx = 0; TriIdx < Section.NumTriangles; ++TriIdx)
 		{
-			const uint32 BaseIndex = Section.FirstIndex + TriIdx * 3;
+			const uint32 IndexBase = Section.FirstIndex + TriIdx * 3;
 
-			if (BaseIndex + 2 < NumVertices)
+			// 检查索引范围
+			if (IndexBase + 2 >= (uint32)NumIndices)
 			{
-				FVector V0 = FVector(PositionBuffer.VertexPosition(BaseIndex));
-				FVector V1 = FVector(PositionBuffer.VertexPosition(BaseIndex + 1));
-				FVector V2 = FVector(PositionBuffer.VertexPosition(BaseIndex + 2));
-
-				V0 = Transform.TransformPosition(V0);
-				V1 = Transform.TransformPosition(V1);
-				V2 = Transform.TransformPosition(V2);
-
-				Triangles.Add(V0);
-				Triangles.Add(V1);
-				Triangles.Add(V2);
+				continue;
 			}
+
+			// 通过索引缓冲获取真正的顶点索引
+			const uint32 Vtx0 = IndexArrayView[IndexBase];
+			const uint32 Vtx1 = IndexArrayView[IndexBase + 1];
+			const uint32 Vtx2 = IndexArrayView[IndexBase + 2];
+
+			// 检查顶点索引范围
+			if (Vtx0 >= NumVertices || Vtx1 >= NumVertices || Vtx2 >= NumVertices)
+			{
+				continue;
+			}
+
+			FVector V0 = FVector(PositionBuffer.VertexPosition(Vtx0));
+			FVector V1 = FVector(PositionBuffer.VertexPosition(Vtx1));
+			FVector V2 = FVector(PositionBuffer.VertexPosition(Vtx2));
+
+			V0 = Transform.TransformPosition(V0);
+			V1 = Transform.TransformPosition(V1);
+			V2 = Transform.TransformPosition(V2);
+
+			Triangles.Add(V0);
+			Triangles.Add(V1);
+			Triangles.Add(V2);
 		}
 	}
 
