@@ -12,8 +12,8 @@ static constexpr float RVO_SQUARE_ROOT_EPSILON = 0.00001f;
 FSkelotRVOSystem::FSkelotRVOSystem()
 	: ProcessedAgents(0)
 	, TotalVelocityAdjustments(1)
-	, FrameCounter(0)
 	, CurrentCollisionRadius(60.0f)
+	, FrameCounter(0)
 {
 	NeighborIndices.Reserve(64);
 	ORCAPlanes.Reserve(32);
