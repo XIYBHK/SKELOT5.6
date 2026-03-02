@@ -336,4 +336,58 @@ static FAutoConsoleVariableRef CVarDebugMode(
 
 ---
 
+## 障碍物系统实现 (2026-03-02)
+
+### 创建文件
+
+- `Source/Skelot/Public/SkelotObstacle.h` - 障碍物基类和派生类
+- `Source/Skelot/Private/SkelotObstacle.cpp` - 障碍物实现
+
+### 实现的功能
+
+| 类 | 功能 |
+|------|------|
+| `ASkelotObstacle` | 抽象基类，提供碰撞接口 |
+| `ASkelotSphereObstacle` | 球形障碍物 |
+| `ASkelotBoxObstacle` | 盒形障碍物（支持旋转） |
+
+### 遇到的问题
+
+1. **TObjectPtr::IsValid() 方法不存在**
+
+   **问题**：`TObjectPtr.IsValid()` 不是有效的成员函数
+   ```cpp
+   // 错误
+   if (!ObstaclePtr.IsValid())
+
+   // 正确
+   if (!ObstaclePtr.Get())
+   ```
+
+   **原因**：TObjectPtr 没有 IsValid() 方法，需要用 Get() 返回原始指针再判断
+
+2. **DrawDebugBox 旋转参数类型**
+
+   **问题**：传入 FRotator 导致编译错误
+   ```cpp
+   // 错误
+   DrawDebugBox(World, Location, Extent, GetActorRotation(), ...);
+
+   // 正确
+   DrawDebugBox(World, Location, Extent, GetActorQuat(), ...);
+   ```
+
+   **原因**：UE5 的 DrawDebugBox 要求 FQuat 类型，不接受 FRotator
+
+### 架构设计
+
+障碍物系统采用以下设计：
+
+1. **自动注册**：障碍物在 BeginPlay 时自动注册到 SkelotWorld
+2. **碰撞掩码**：支持按碰撞通道过滤
+3. **PBD 集成**：在 PBD 碰撞求解后额外处理障碍物碰撞
+4. **PostObstacleIterations**：障碍物碰撞后额外迭代以提高稳定性
+
+---
+
 *最后更新: 2026-03-02*
