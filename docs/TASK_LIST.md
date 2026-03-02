@@ -108,7 +108,7 @@
 | QueryLocationOverlappingBox | P1 | ✅ | 盒形范围查询 |
 | QuerySphere 掩码过滤 | P0 | ✅ | CollisionMask 参数过滤结果 |
 | QueryBox 掩码过滤 | P1 | ✅ | CollisionMask 参数过滤结果 |
-| 空间网格调试可视化 | P2 | ⬜ | DrawDebug 网格边界 |
+| 空间网格调试可视化 | P2 | ✅ | DrawDebug 网格边界 |
 
 ### 3.3 技术调研
 | 任务 | 状态 | 说明 |
@@ -314,9 +314,9 @@ git commit -m "feat(Ed): 实现编辑器扩展 - 右键菜单资产创建功能
 ### 9.2 文档更新
 | 任务 | 优先级 | 状态 | 说明 |
 |------|--------|------|------|
-| API 文档更新 | P1 | ⬜ | 新增 API 说明 |
-| 配置参数文档 | P1 | ⬜ | PBD/RVO 参数说明 |
-| 最佳实践指南 | P2 | ⬜ | 性能优化建议 |
+| API 文档更新 | P1 | ✅ | 新增 API 说明 |
+| 配置参数文档 | P1 | ✅ | PBD/RVO 参数说明 |
+| 最佳实践指南 | P2 | ✅ | 性能优化建议 |
 
 ---
 
@@ -328,14 +328,14 @@ git commit -m "feat(Ed): 实现编辑器扩展 - 右键菜单资产创建功能
 | Phase 1.5: 动画系统 | 5 | 5 | 100% |
 | Phase 2: 碰撞通道 | 10 | 10 | 100% |
 | Phase 2.5: 层级关系 | 4 | 4 | 100% |
-| Phase 3: 空间检测 | 13 | 8 | 62% |
+| Phase 3: 空间检测 | 13 | 9 | 69% |
 | Phase 4: PBD 系统 | 16 | 14 | 88% |
 | Phase 5: RVO 系统 | 18 | 17 | 94% |
 | Phase 6: LOD 系统 | 6 | 6 | 100% |
 | Phase 7: 几何工具 | 14 | 11 | 79% |
 | Phase 8: 编辑器 | 7 | 6 | 86% |
-| Phase 9: 示例文档 | 7 | 4 | 57% |
-| **总计** | **108** | **93** | **86%** |
+| Phase 9: 示例文档 | 7 | 7 | 100% |
+| **总计** | **108** | **97** | **90%** |
 
 ---
 
@@ -360,6 +360,7 @@ git commit -m "feat(Ed): 实现编辑器扩展 - 右键菜单资产创建功能
 
 | 日期 | 更新内容 |
 |------|----------|
+| 2026-03-02 | 完成 Phase 9.2 文档更新：创建 API_REFERENCE.md（完整 API 参考文档，10个模块 50+ API 说明）、CONFIGURATION.md（PBD/RVO 配置参数指南，推荐配置表，调试建议） |
 | 2026-03-02 | 完成 Phase 9.1 性能测试关卡：ASkelotExampleStressTest Actor，支持 4-5w 实例压力测试，FPS/帧时间统计，HUD 显示，四种测试模式（静态/移动/移动+PBD/移动+PBD+RVO），键盘交互控制 |
 | 2026-03-02 | 完成 Phase 7 几何工具库剩余功能：GetPointsByMesh（静态网格表面点+三角形面积加权采样）、GetPointsByMeshVoxel（体素化外壳/实心）、GetPointsBySpline（样条曲线点带）、GetPixelsByTexture（纹理像素提取），Mesh/Voxel 功能仅编辑器可用 |
 | 2026-03-02 | 完成 Phase 9.1 示例关卡 Actor 类：ASkelotExampleBasicInstance（基础实例创建/销毁/动画）、ASkelotExampleCollisionAvoidance（PBD+RVO碰撞避让）、ASkelotExampleGeometryTools（几何工具点位生成），支持键盘交互演示各功能，添加 InputCore 模块依赖 |
