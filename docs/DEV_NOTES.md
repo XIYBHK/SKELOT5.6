@@ -466,4 +466,98 @@ static FAutoConsoleVariableRef CVarDebugMode(
 
 ---
 
+## 几何工具库 Mesh 功能实现 (2026-03-02)
+
+### 新增功能
+
+| 函数 | 说明 |
+|------|------|
+| `GetPointsByMesh` | 静态网格表面点，三角形面积加权采样 |
+| `GetPointsByMeshVoxel` | 体素化点生成，支持外壳/实心模式 |
+| `GetPointsBySpline` | 沿样条曲线生成点带 |
+| `GetPixelsByTexture` | 从纹理提取像素数据 |
+
+### 遇到的问题
+
+1. **StaticMeshResources API 在 UE5.6 中不可用**
+
+   **问题**：`FStaticMeshRenderData`、`FStaticMeshLODResources` 等类型在 Game 构建中编译错误
+   ```
+   error C2027: 使用了未定义类型"FStaticMeshRenderData"
+   ```
+
+   **解决方案**：使用 `WITH_EDITORONLY_DATA` 宏包裹编辑器专用代码
+   ```cpp
+   #if WITH_EDITORONLY_DATA
+   #include "StaticMeshResources.h"
+   // ... 编辑器专用实现
+   #else
+   // 运行时返回空数组或占位数据
+   #endif
+   ```
+
+2. **索引缓冲 API 变化**
+
+   **问题**：`FRawStaticIndexBuffer::GetIndex32/GetIndex16` 和 `GetDataTypeSize()` 在 UE5.6 中不存在
+
+   **解决方案**：改用 `FStaticMeshSection` 遍历三角形，直接用 Section.FirstIndex 作为顶点索引
+   ```cpp
+   for (uint32 TriIdx = 0; TriIdx < Section.NumTriangles; ++TriIdx)
+   {
+       const uint32 BaseIndex = Section.FirstIndex + TriIdx * 3;
+       FVector V0 = FVector(PositionBuffer.VertexPosition(BaseIndex));
+       // ...
+   }
+   ```
+
+3. **FBox::GetCorner 不存在**
+
+   **问题**：`ExpandedBounds.GetCorner(i)` 编译错误
+
+   **解决方案**：手动定义 8 个角点坐标
+   ```cpp
+   const FVector Corners[8] = {
+       FVector(Min.X, Min.Y, Min.Z),
+       FVector(Max.X, Min.Y, Min.Z),
+       // ... 其余 6 个角点
+   };
+   ```
+
+4. **FTexturePlatformData::GetMips() 变化**
+
+   **问题**：`PlatformData->GetMips()` 方法不存在
+
+   **解决方案**：直接访问 `PlatformData->Mips` 成员
+   ```cpp
+   // 错误
+   FTexture2DMipMap& Mip = PlatformData->GetMips()[0];
+
+   // 正确
+   TArray<FTexture2DMipMap>& Mips = PlatformData->Mips;
+   FTexture2DMipMap& Mip = Mips[0];
+   ```
+
+### 算法要点
+
+1. **三角形面积加权采样**：确保表面点均匀分布
+   - 计算每个三角形面积和累积面积
+   - 随机选择三角形（面积大的概率高）
+   - 在选中的三角形内生成随机点
+
+2. **体素化内外判定**：使用射线投射法
+   - 从体素中心发射射线（X 方向）
+   - 统计与三角形的交点数
+   - 奇数 = 内部，偶数 = 外部
+
+3. **外壳模式**：检测体素到三角形表面距离
+   - 计算 SearchRadius = HalfVoxel * sqrt(3)
+   - 检查体素中心到最近三角形的距离
+
+### 注意事项
+
+- Mesh/Voxel 功能仅编辑器可用，运行时返回空数组
+- 可考虑未来使用 Physics API 实现运行时版本
+
+---
+
 *最后更新: 2026-03-02*
