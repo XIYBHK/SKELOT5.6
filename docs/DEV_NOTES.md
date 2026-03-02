@@ -390,4 +390,80 @@ static FAutoConsoleVariableRef CVarDebugMode(
 
 ---
 
+## 示例 Actor 类实现 (2026-03-02)
+
+### 创建文件
+
+- `Source/Skelot/Public/SkelotExampleActors.h` - 示例 Actor 头文件
+- `Source/Skelot/Private/SkelotExampleActors.cpp` - 示例 Actor 实现
+
+### 实现的类
+
+| 类名 | 功能 | 演示内容 |
+|------|------|----------|
+| `ASkelotExampleBasicInstance` | 基础实例操作 | 创建/销毁/动画播放/变换操作 |
+| `ASkelotExampleCollisionAvoidance` | 碰撞避让演示 | PBD 碰撞 + RVO 避障 + 群体移动 |
+| `ASkelotExampleGeometryTools` | 几何工具演示 | 圆形/网格/贝塞尔曲线点阵生成 |
+
+### 遇到的问题
+
+1. **UPROPERTY 中枚举声明语法**
+
+   **问题**：在 UPROPERTY 中声明 enum class 导致 UHT 错误
+   ```cpp
+   // 错误
+   UPROPERTY()
+   enum class EPattern : uint8 { ... } Pattern;
+
+   // 正确
+   UPROPERTY()
+   uint8 Pattern = 0;  // 使用整数代替
+   ```
+
+2. **FSkelotAnimPlayParams 成员名称**
+
+   **问题**：使用 `PlayRate` 编译错误
+   ```cpp
+   // 错误
+   Params.PlayRate = 1.0f;
+
+   // 正确
+   Params.PlayScale = 1.0f;
+   ```
+
+3. **ASkelotWorld 缺少批量销毁方法**
+
+   **问题**：ASkelotWorld 没有 `DestroyInstances` 方法
+
+   **解决方案**：使用 `USkelotWorldSubsystem::Skelot_DestroyInstances`
+
+4. **FQuat4f 类型转换**
+
+   **问题**：FRotator 无法直接转换为 FQuat4f
+   ```cpp
+   // 错误
+   FQuat4f Rot = FQuat4f(FRotator(...));
+
+   // 正确
+   FQuat Rot = FRotator(...).Quaternion();
+   SkelotWorld->SetInstanceRotation(Index, FQuat4f(Rot));
+   ```
+
+5. **InputCore 模块依赖**
+
+   **问题**：使用 EKeys 需要链接 InputCore 模块
+
+   **解决方案**：在 `Skelot.Build.cs` 中添加 `"InputCore"` 依赖
+
+### 架构设计
+
+示例 Actor 类采用以下设计：
+
+1. **可配置参数**：所有参数通过 UPROPERTY 暴露给编辑器
+2. **键盘交互**：支持通过键盘键位触发不同功能演示
+3. **详细注释**：每个类都有完整的使用说明和演示内容
+4. **模块化设计**：每个示例类独立，用户可以按需使用
+
+---
+
 *最后更新: 2026-03-02*

@@ -29,7 +29,7 @@ public class Skelot : ModuleRules
 		PublicDependencyModuleNames.AddRange(
 			new string[]
 			{
-				"Core",  "RenderCore", "Engine", "NiagaraAnimNotifies", "Niagara", "Renderer", 
+				"Core",  "RenderCore", "Engine", "NiagaraAnimNotifies", "Niagara", "Renderer", "InputCore",
 				// ... add other public dependencies that you statically link with here ...
 			}
 
