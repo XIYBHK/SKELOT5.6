@@ -290,7 +290,7 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	//Attach @Child instance to @Parent
 	UFUNCTION(BlueprintCallable, Category="Skelot|层级", meta=(WorldContext="WorldContextObject", AutoCreateRefTerm = "ReletiveTransform", DisplayName = "附加子实例"))
-	static void SkelotAttachChild(const UObject* WorldContextObject, FSkelotInstanceHandle Parent, FSkelotInstanceHandle Child, FName SocketOrBoneName, const FTransform& ReletiveTransform);
+	static void SkelotAttachChild(const UObject* WorldContextObject, FSkelotInstanceHandle Parent, FSkelotInstanceHandle Child, FName SocketOrBoneName, const FTransform& ReletiveTransform, bool bKeepWorldTransform = false);
 	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintCallable, Category="Skelot|层级", meta=(WorldContext="WorldContextObject", DisplayName = "从父级分离"))
 	static void SkelotDetachFromParent(const UObject* WorldContextObject, FSkelotInstanceHandle Handle);

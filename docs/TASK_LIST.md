@@ -374,6 +374,7 @@ git commit -m "feat(Ed): 实现编辑器扩展 - 右键菜单资产创建功能
 
 | 日期 | 更新内容 |
 |------|----------|
+| 2026-03-03 | 补充层级关系 API 缺失参数：SkelotAttachChild 添加 bKeepWorldTransform 参数，支持附加时保持子实例世界位置不变 |
 | 2026-03-03 | 补充移动系统蓝图 API：Skelot_SetInstanceVelocity、Skelot_SetInstanceVelocityByIndex、Skelot_GetInstanceVelocity、Skelot_GetInstanceVelocityByIndex、Skelot_SetInstanceVelocities（批量）、Skelot_SetInstanceVelocitiesByIndex（批量），共 6 个蓝图函数 |
 | 2026-03-03 | 项目完成度审核：所有参考文档需求功能已实现（97/97=100%），将"速度数据持久化"标记为暂不需要（参考文档未提及），整理"暂不实现的任务"列表（调研结论/非核心功能），更新进度统计方式 |
 | 2026-03-02 | 完成 Phase 5.1 HRVO 混合模式：ComputeHRVOPlane（迎面检测+VO/RVO选择）、IsHeadOnCollision（迎面碰撞检测）、ComputeRVOPlane（互惠避障）、ComputeVOPlane（单方避障），新增配置参数 bEnableHRVO 和 HRVOHeadOnThreshold |

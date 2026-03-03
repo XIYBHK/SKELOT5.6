@@ -348,8 +348,9 @@ public:
 	FSkelotAttachParentData& GetOrCreateInstanceAttachParentData(int32 InstanceIndex);
 	FSkelotAttachParentData* GetInstanceAttachParentData(int32 InstanceIndex) const;
 
-	//attach @Child to @parent 
-	bool InstanceAttachChild(FSkelotInstanceHandle Parent, FSkelotInstanceHandle Child, FName SocketOrBoneName, const FTransform& ReletiveTransform);
+	//attach @Child to @parent
+	// @param bKeepWorldTransform if true, keep child's world transform after attachment
+	bool InstanceAttachChild(FSkelotInstanceHandle Parent, FSkelotInstanceHandle Child, FName SocketOrBoneName, const FTransform& ReletiveTransform, bool bKeepWorldTransform = false);
 	//detach the instance from its parent if any
 	void DetachInstanceFromParent(FSkelotInstanceHandle H);
 	//

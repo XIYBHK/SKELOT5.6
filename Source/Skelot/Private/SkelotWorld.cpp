@@ -1829,10 +1829,17 @@ FSkelotAttachParentData* ASkelotWorld::GetInstanceAttachParentData(int32 Instanc
 	return AttchIdx != -1 ? const_cast<FSkelotAttachParentData*>(&AttachParentArray[AttchIdx]) : nullptr;
 }
 
-bool ASkelotWorld::InstanceAttachChild(FSkelotInstanceHandle Parent, FSkelotInstanceHandle Child, FName SocketOrBoneName, const FTransform& ReletiveTransform)
+bool ASkelotWorld::InstanceAttachChild(FSkelotInstanceHandle Parent, FSkelotInstanceHandle Child, FName SocketOrBoneName, const FTransform& ReletiveTransform, bool bKeepWorldTransform)
 {
 	if (IsHandleValid(Parent) && IsHandleValid(Child))
 	{
+		// Store child's world transform before attachment if bKeepWorldTransform
+		FTransform ChildWorldTransform;
+		if (bKeepWorldTransform)
+		{
+			ChildWorldTransform = GetInstanceTransform(Child.InstanceIndex);
+		}
+
 		FSkelotAttachParentData& AttachFrag = this->Internal_InstanceAttachChild(Parent.InstanceIndex, Child.InstanceIndex);
 		AttachFrag.RelativeTransform = (FTransform3f)ReletiveTransform;
 		AttachFrag.SocketPtr = nullptr;
@@ -1855,6 +1862,13 @@ bool ASkelotWorld::InstanceAttachChild(FSkelotInstanceHandle Parent, FSkelotInst
 		}
 
 		UpdateChildTransforms(Parent.InstanceIndex);
+
+		// Restore child's world transform if bKeepWorldTransform
+		if (bKeepWorldTransform)
+		{
+			SetInstanceTransform(Child.InstanceIndex, ChildWorldTransform);
+		}
+
 		return true;
 	}
 

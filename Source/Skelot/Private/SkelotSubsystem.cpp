@@ -250,10 +250,10 @@ void USkelotWorldSubsystem::Skelot_GetAllHandles(const UObject* WorldContextObje
 		Singleton->GetAllHandles(Handles);
 }
 
-void USkelotWorldSubsystem::SkelotAttachChild(const UObject* WorldContextObject, FSkelotInstanceHandle Parent, FSkelotInstanceHandle Child, FName SocketOrBoneName, const FTransform& ReletiveTransform)
+void USkelotWorldSubsystem::SkelotAttachChild(const UObject* WorldContextObject, FSkelotInstanceHandle Parent, FSkelotInstanceHandle Child, FName SocketOrBoneName, const FTransform& ReletiveTransform, bool bKeepWorldTransform)
 {
 	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
-		Singleton->InstanceAttachChild(Parent, Child, SocketOrBoneName, ReletiveTransform);
+		Singleton->InstanceAttachChild(Parent, Child, SocketOrBoneName, ReletiveTransform, bKeepWorldTransform);
 }
 void USkelotWorldSubsystem::SkelotDetachFromParent(const UObject* WorldContextObject, FSkelotInstanceHandle Handle)
 {
