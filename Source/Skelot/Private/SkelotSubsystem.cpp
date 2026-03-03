@@ -549,6 +549,65 @@ uint8 USkelotWorldSubsystem::Skelot_GetInstanceCollisionMaskByHandle(const UObje
 	return SkelotCollision::DefaultCollisionMask;
 }
 
+//////////////////////////////////////////////////////////////////////////
+// Velocity API Implementation
+
+void USkelotWorldSubsystem::Skelot_SetInstanceVelocity(const UObject* WorldContextObject, FSkelotInstanceHandle Handle, const FVector3f& Velocity)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject, Handle))
+	{
+		Singleton->SetInstanceVelocity(Handle, Velocity);
+	}
+}
+
+void USkelotWorldSubsystem::Skelot_SetInstanceVelocityByIndex(const UObject* WorldContextObject, int32 InstanceIndex, const FVector3f& Velocity)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+	{
+		if (InstanceIndex >= 0 && InstanceIndex < Singleton->GetNumInstance() && Singleton->IsInstanceAlive(InstanceIndex))
+		{
+			Singleton->SetInstanceVelocity(InstanceIndex, Velocity);
+		}
+	}
+}
+
+FVector3f USkelotWorldSubsystem::Skelot_GetInstanceVelocity(const UObject* WorldContextObject, FSkelotInstanceHandle Handle)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject, Handle))
+	{
+		return Singleton->GetInstanceVelocity(Handle);
+	}
+	return FVector3f::ZeroVector;
+}
+
+FVector3f USkelotWorldSubsystem::Skelot_GetInstanceVelocityByIndex(const UObject* WorldContextObject, int32 InstanceIndex)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+	{
+		if (InstanceIndex >= 0 && InstanceIndex < Singleton->GetNumInstance() && Singleton->IsInstanceAlive(InstanceIndex))
+		{
+			return Singleton->GetInstanceVelocity(InstanceIndex);
+		}
+	}
+	return FVector3f::ZeroVector;
+}
+
+void USkelotWorldSubsystem::Skelot_SetInstanceVelocities(const UObject* WorldContextObject, const TArray<FSkelotInstanceHandle>& Handles, const TArray<FVector3f>& Velocities)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+	{
+		Singleton->SetInstanceVelocities(Handles, Velocities);
+	}
+}
+
+void USkelotWorldSubsystem::Skelot_SetInstanceVelocitiesByIndex(const UObject* WorldContextObject, const TArray<int32>& InstanceIndices, const TArray<FVector3f>& Velocities)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+	{
+		Singleton->SetInstanceVelocities(InstanceIndices, Velocities);
+	}
+}
+
 UActorComponent* USkelotFunctionLib::SpawnComponent(const UObject* WorldContextObject, TSubclassOf<UActorComponent> Class, const FTransform& Transform)
 {
 	UActorComponent* Comp = NewObject<UActorComponent>(GetTransientPackage(), Class);

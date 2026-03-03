@@ -94,6 +94,64 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Skelot|碰撞", meta=(WorldContext="WorldContextObject", DisplayName = "获取实例碰撞掩码(句柄)"))
 	static uint8 Skelot_GetInstanceCollisionMaskByHandle(const UObject* WorldContextObject, FSkelotInstanceHandle Handle);
 
+	//////////////////////////////////////////////////////////////////////////
+	// Velocity API - for PBD collision and RVO avoidance systems
+	// 速度系统 API - 用于 PBD 碰撞和 RVO 避障系统
+
+	/**
+	 * 设置实例速度（通过句柄）
+	 * @param WorldContextObject 世界上下文对象
+	 * @param Handle 实例句柄
+	 * @param Velocity 速度向量（厘米/秒）
+	 */
+	UFUNCTION(BlueprintCallable, Category="Skelot|移动", meta=(WorldContext="WorldContextObject", DisplayName = "设置实例速度"))
+	static void Skelot_SetInstanceVelocity(const UObject* WorldContextObject, FSkelotInstanceHandle Handle, const FVector3f& Velocity);
+
+	/**
+	 * 设置实例速度（通过索引，比句柄版本更快）
+	 * @param WorldContextObject 世界上下文对象
+	 * @param InstanceIndex 实例索引
+	 * @param Velocity 速度向量（厘米/秒）
+	 */
+	UFUNCTION(BlueprintCallable, Category="Skelot|移动", meta=(WorldContext="WorldContextObject", DisplayName = "设置实例速度(索引)"))
+	static void Skelot_SetInstanceVelocityByIndex(const UObject* WorldContextObject, int32 InstanceIndex, const FVector3f& Velocity);
+
+	/**
+	 * 获取实例速度（通过句柄）
+	 * @param WorldContextObject 世界上下文对象
+	 * @param Handle 实例句柄
+	 * @return 速度向量（厘米/秒）
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Skelot|移动", meta=(WorldContext="WorldContextObject", DisplayName = "获取实例速度"))
+	static FVector3f Skelot_GetInstanceVelocity(const UObject* WorldContextObject, FSkelotInstanceHandle Handle);
+
+	/**
+	 * 获取实例速度（通过索引）
+	 * @param WorldContextObject 世界上下文对象
+	 * @param InstanceIndex 实例索引
+	 * @return 速度向量（厘米/秒）
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Skelot|移动", meta=(WorldContext="WorldContextObject", DisplayName = "获取实例速度(索引)"))
+	static FVector3f Skelot_GetInstanceVelocityByIndex(const UObject* WorldContextObject, int32 InstanceIndex);
+
+	/**
+	 * 批量设置实例速度（通过句柄数组）
+	 * @param WorldContextObject 世界上下文对象
+	 * @param Handles 实例句柄数组
+	 * @param Velocities 速度数组，需与句柄数组一一对应
+	 */
+	UFUNCTION(BlueprintCallable, Category="Skelot|移动", meta=(WorldContext="WorldContextObject", DisplayName = "批量设置实例速度"))
+	static void Skelot_SetInstanceVelocities(const UObject* WorldContextObject, const TArray<FSkelotInstanceHandle>& Handles, const TArray<FVector3f>& Velocities);
+
+	/**
+	 * 批量设置实例速度（通过索引数组）
+	 * @param WorldContextObject 世界上下文对象
+	 * @param InstanceIndices 实例索引数组
+	 * @param Velocities 速度数组，需与索引数组一一对应
+	 */
+	UFUNCTION(BlueprintCallable, Category="Skelot|移动", meta=(WorldContext="WorldContextObject", DisplayName = "批量设置实例速度(索引)"))
+	static void Skelot_SetInstanceVelocitiesByIndex(const UObject* WorldContextObject, const TArray<int32>& InstanceIndices, const TArray<FVector3f>& Velocities);
+
 
 	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintCallable, Category="Skelot|工具", meta=(WorldContext="WorldContextObject", DisplayName = "按组随机附加网格体"))
