@@ -114,8 +114,8 @@
 | 任务 | 状态 | 说明 |
 |------|------|------|
 | ✅ 空间哈希算法 | 已完成 | 参考 [Spatial Hashing](https://m.php.cn/faq/1927461.html) |
-| ⬜ Morton 编码优化 | 待调研 | Z-order curve 提升空间局部性 |
-| ⬜ GPU 空间查询 | 待调研 | Compute Shader 实现 |
+| ❌ Morton 编码优化 | 不采用 | 调研结论：只对连续数组有效，TMap 无收益 |
+| ❌ GPU 空间查询 | 不采用 | 架构改动大，数据传输开销抵消收益 |
 
 ---
 
@@ -150,8 +150,8 @@
 | 任务 | 状态 | 说明 |
 |------|------|------|
 | ✅ PBD 算法原理 | 已完成 | 参考 [Position Based Dynamics](https://blog.csdn.net/gitblog_00393/article/details/151500546) |
-| ⬜ GPU PBD 实现 | 待调研 | Compute Shader 加速 |
-| ⬜ 密度自适应 | 待调研 | 高密度时自动降响应 |
+| ❌ GPU PBD 实现 | 不采用 | 成本高，当前性能已满足 5 万实例 30+ FPS |
+| ✅ 密度自适应 | 已实现 | 见 Phase 5.3，GetDensityAdaptationFactor |
 
 ---
 
@@ -188,8 +188,8 @@
 | 任务 | 状态 | 说明 |
 |------|------|------|
 | ✅ RVO/ORCA 算法 | 已完成 | 参考 [RVO算法详解](https://blog.csdn.net/weixin_42216813/article/details/147072134) |
-| ⬜ RVO2 库集成 | 待调研 | C#/C++ 开源实现 |
-| ⬜ Flow Field 结合 | 待调研 | 与流场寻路结合 |
+| ❌ RVO2 库集成 | 不采用 | 已有自研实现，无需外部依赖 |
+| ❌ Flow Field 结合 | 不采用 | 寻路扩展方向，超出参考插件功能范围 |
 
 ---
 
@@ -341,16 +341,16 @@ git commit -m "feat(Ed): 实现编辑器扩展 - 右键菜单资产创建功能
 
 ### 暂不实现的任务（不计入统计）
 
-> **说明**：以下任务来自预研文档（TECHNICAL_RESEARCH.md）的技术探索建议，**不是参考插件说明文档的功能需求**。项目目标为 1:1 复刻参考插件功能，这些任务超出范围。
+> **说明**：以下任务来自预研文档（TECHNICAL_RESEARCH.md）的技术探索建议，**不是参考插件说明文档的功能需求**。项目目标为 1:1 复刻参考插件功能，这些任务超出范围。已通过技术审查确认不采用。
 
-| 任务 | 来源 | 说明 |
-|------|------|------|
+| 任务 | 来源 | 审查结论 |
+|------|------|----------|
 | 速度数据持久化 | 内部设想 | 参考文档未提及，不需要 |
-| Morton 编码优化 | 预研文档 | 调研结论：只对连续数组有效，TMap 无收益 |
-| GPU 空间查询 | 预研文档 | 性能优化方向，非功能需求 |
-| GPU PBD 实现 | 预研文档 | 性能优化方向，非功能需求 |
+| Morton 编码优化 | 预研文档 | 只对连续数组有效，TMap 无收益 |
+| GPU 空间查询 | 预研文档 | 架构改动大，数据传输开销抵消收益 |
+| GPU PBD 实现 | 预研文档 | 成本高，当前性能已满足 5 万实例 30+ FPS |
 | RVO2 库集成 | 预研文档 | 已有自研实现，无需外部依赖 |
-| Flow Field 结合 | 预研文档 | 寻路扩展方向，非功能需求 |
+| Flow Field 结合 | 预研文档 | 寻路扩展方向，超出参考插件功能范围 |
 
 ---
 
@@ -375,6 +375,7 @@ git commit -m "feat(Ed): 实现编辑器扩展 - 右键菜单资产创建功能
 
 | 日期 | 更新内容 |
 |------|----------|
+| 2026-03-03 | 待调研任务技术审查：6 项预研任务逐一评估，确认全部不采用（Morton 编码对 TMap 无效、GPU 方案成本高、RVO2 已自研、Flow Field 超范围），修正"密度自适应"状态（Phase 4.4→Phase 5.3 已实现），统一状态标记为 ❌ 不采用 |
 | 2026-03-03 | 补充层级关系 API 缺失参数：SkelotAttachChild 添加 bKeepWorldTransform 参数，支持附加时保持子实例世界位置不变 |
 | 2026-03-03 | 补充移动系统蓝图 API：Skelot_SetInstanceVelocity、Skelot_SetInstanceVelocityByIndex、Skelot_GetInstanceVelocity、Skelot_GetInstanceVelocityByIndex、Skelot_SetInstanceVelocities（批量）、Skelot_SetInstanceVelocitiesByIndex（批量），共 6 个蓝图函数 |
 | 2026-03-03 | 项目完成度审核：所有参考文档需求功能已实现（97/97=100%），将"速度数据持久化"标记为暂不需要（参考文档未提及），整理"暂不实现的任务"列表（调研结论/非核心功能），更新进度统计方式 |
