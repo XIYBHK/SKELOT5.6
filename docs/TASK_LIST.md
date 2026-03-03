@@ -375,6 +375,7 @@ git commit -m "feat(Ed): 实现编辑器扩展 - 右键菜单资产创建功能
 
 | 日期 | 更新内容 |
 |------|----------|
+| 2026-03-03 | 创建 TECHNICAL_COMPARISON.md 技术对比报告：对比 Unity GPU Instancer、DOTS RVO、Recast DetourCrowd 等业界方案，分析渲染/避障/空间网格优劣势，定位单线程为致命瓶颈（差距 10-15x），提出多线程化和数据结构优化建议 |
 | 2026-03-03 | 待调研任务技术审查：6 项预研任务逐一评估，确认全部不采用（Morton 编码对 TMap 无效、GPU 方案成本高、RVO2 已自研、Flow Field 超范围），修正"密度自适应"状态（Phase 4.4→Phase 5.3 已实现），统一状态标记为 ❌ 不采用 |
 | 2026-03-03 | 补充层级关系 API 缺失参数：SkelotAttachChild 添加 bKeepWorldTransform 参数，支持附加时保持子实例世界位置不变 |
 | 2026-03-03 | 补充移动系统蓝图 API：Skelot_SetInstanceVelocity、Skelot_SetInstanceVelocityByIndex、Skelot_GetInstanceVelocity、Skelot_GetInstanceVelocityByIndex、Skelot_SetInstanceVelocities（批量）、Skelot_SetInstanceVelocitiesByIndex（批量），共 6 个蓝图函数 |
