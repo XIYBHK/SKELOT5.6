@@ -75,6 +75,15 @@ public:
 	static void Skelot_AttachMeshes(const UObject* WorldContextObject, FSkelotInstanceHandle Handle, const TArray<USkeletalMesh*>& Meshes, bool bAttach = true);
 
 	//////////////////////////////////////////////////////////////////////////
+	// LOD Update Frequency API
+	UFUNCTION(BlueprintCallable, Category="Skelot|LOD", meta=(WorldContext="WorldContextObject", DisplayName = "设置LOD更新频率启用"))
+	static void Skelot_SetLODUpdateFrequencyEnabled(const UObject* WorldContextObject, bool bEnable);
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Skelot|LOD", meta=(WorldContext="WorldContextObject", DisplayName = "获取LOD更新频率启用"))
+	static bool Skelot_IsLODUpdateFrequencyEnabled(const UObject* WorldContextObject);
+	UFUNCTION(BlueprintCallable, Category="Skelot|LOD", meta=(WorldContext="WorldContextObject", DisplayName = "设置LOD距离阈值"))
+	static void Skelot_SetLODDistances(const UObject* WorldContextObject, float MediumDistance, float FarDistance);
+
+	//////////////////////////////////////////////////////////////////////////
 	// Collision Channel API
 	UFUNCTION(BlueprintCallable, Category="Skelot|碰撞", meta=(WorldContext="WorldContextObject", DisplayName = "设置实例碰撞通道"))
 	static void Skelot_SetInstanceCollisionChannel(const UObject* WorldContextObject, int32 InstanceIndex, ESkelotCollisionChannel Channel);

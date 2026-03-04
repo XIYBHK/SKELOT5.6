@@ -144,6 +144,7 @@ private:
 	 * @return 是否进行了速度调整
 	 */
 	bool ComputeAgentAvoidance(const FSkelotInstancesSOA& SOA, int32 InstanceIndex,
+							   const TArray<FVector3f>& InputVelocities,
 							   const FSkelotSpatialGrid& SpatialGrid,
 							   float DeltaTime,
 							   TArray<int32>& LocalNeighborIndices,

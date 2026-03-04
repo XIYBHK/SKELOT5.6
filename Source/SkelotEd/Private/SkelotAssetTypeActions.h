@@ -18,16 +18,16 @@ public:
 
 private:
 	/** 创建 Skelot 动画集合 */
-	void CreateAnimCollection(TArray<FString> AssetPaths);
+	void CreateAnimCollection(const TArray<FString>& AssetPaths);
 	/** 创建 Skelot 渲染参数 */
-	void CreateRenderParams(TArray<FString> AssetPaths);
+	void CreateRenderParams(const TArray<FString>& AssetPaths);
 	/** 创建所有 Skelot 资产 (动画集合 + 渲染参数) */
-	void CreateAllSkelotAssets(TArray<FString> AssetPaths);
+	void CreateAllSkelotAssets(const TArray<FString>& AssetPaths);
 
 	/** 执行创建 AnimCollection */
-	void ExecuteCreateAnimCollection(const TArray<FString> AssetPaths);
+	void ExecuteCreateAnimCollection(TArray<FString> AssetPaths);
 	/** 执行创建 RenderParams */
-	void ExecuteCreateRenderParams(const TArray<FString> AssetPaths);
+	void ExecuteCreateRenderParams(TArray<FString> AssetPaths);
 	/** 执行创建所有资产 */
-	void ExecuteCreateAllAssets(const TArray<FString> AssetPaths);
+	void ExecuteCreateAllAssets(TArray<FString> AssetPaths);
 };

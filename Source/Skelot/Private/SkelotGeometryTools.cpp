@@ -226,43 +226,41 @@ TArray<FVector> USkelotGeometryTools::GetPointsByShape(UPrimitiveComponent* Shap
 		}
 		else
 		{
-			// 球体填充 - 使用球坐标分层填充
-			const int32 NumLayers = FMath::CeilToInt(SphereRadius / Distance);
-
-			for (int32 Layer = 0; Layer <= NumLayers; ++Layer)
+			// 球体填充 - 按 Z 切片填充每层圆盘
+			const int32 NumZSlices = FMath::CeilToInt((SphereRadius * 2.0f) / Distance);
+			for (int32 Slice = 0; Slice <= NumZSlices; ++Slice)
 			{
-				const float LayerRadius = Layer * Distance;
-				if (LayerRadius > SphereRadius)
+				const float Z = -SphereRadius + Slice * Distance;
+				if (Z < -SphereRadius || Z > SphereRadius)
 				{
-					break;
+					continue;
 				}
 
-				if (Layer == 0)
+				const float SliceRadiusSq = SphereRadius * SphereRadius - Z * Z;
+				if (SliceRadiusSq <= 0.0f)
 				{
-					// 中心点
-					Points.Add(Origin);
-				}
-				else
-				{
-					// 使用圆形填充的XY切片
-					TArray<FVector2D> CircleOffsets = GenerateCircleOffsets(LayerRadius, Distance);
-					for (const FVector2D& Offset : CircleOffsets)
+					FVector WorldPoint = ComponentTransform.TransformPosition(FVector(0.0f, 0.0f, Z));
+					if (Noise > 0.0f)
 					{
-						FVector LocalPoint(Offset.X, Offset.Y, 0.0f);
-
-						// 检查是否在球内
-						if (LocalPoint.SizeSquared() <= SphereRadius * SphereRadius)
-						{
-							FVector WorldPoint = ComponentTransform.TransformPosition(LocalPoint);
-
-							if (Noise > 0.0f)
-							{
-								WorldPoint = ApplyNoise(WorldPoint, Noise);
-							}
-
-							Points.Add(WorldPoint);
-						}
+						WorldPoint = ApplyNoise(WorldPoint, Noise);
 					}
+					Points.Add(WorldPoint);
+					continue;
+				}
+
+				const float SliceRadius = FMath::Sqrt(SliceRadiusSq);
+				const TArray<FVector2D> CircleOffsets = GenerateCircleOffsets(SliceRadius, Distance);
+				for (const FVector2D& Offset : CircleOffsets)
+				{
+					FVector LocalPoint(Offset.X, Offset.Y, Z);
+					FVector WorldPoint = ComponentTransform.TransformPosition(LocalPoint);
+
+					if (Noise > 0.0f)
+					{
+						WorldPoint = ApplyNoise(WorldPoint, Noise);
+					}
+
+					Points.Add(WorldPoint);
 				}
 			}
 		}

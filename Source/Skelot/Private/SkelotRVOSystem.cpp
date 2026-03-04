@@ -107,6 +107,13 @@ void FSkelotRVOSystem::ComputeAvoidance(FSkelotInstancesSOA& SOA, int32 NumInsta
 	FrameCounter = (FrameCounter + 1) % Config.FrameStride;
 	TArray<uint8> UpdatedFlags;
 	UpdatedFlags.SetNumZeroed(NumInstances);
+	TArray<FVector3f> InputVelocities;
+	InputVelocities.SetNumUninitialized(NumInstances);
+	for (int32 InstanceIndex = 0; InstanceIndex < NumInstances; ++InstanceIndex)
+	{
+		InputVelocities[InstanceIndex] = SOA.Velocities[InstanceIndex];
+	}
+	TArray<FVector3f> OutputVelocities = InputVelocities;
 
 	ParallelFor(NumInstances, [&](int32 InstanceIndex)
 	{
@@ -127,10 +134,10 @@ void FSkelotRVOSystem::ComputeAvoidance(FSkelotInstancesSOA& SOA, int32 NumInsta
 
 		// 计算避障
 		FVector3f NewVelocity;
-		if (ComputeAgentAvoidance(SOA, InstanceIndex, SpatialGrid, DeltaTime, LocalNeighborIndices, LocalORCAPlanes, NewVelocity))
+		if (ComputeAgentAvoidance(SOA, InstanceIndex, InputVelocities, SpatialGrid, DeltaTime, LocalNeighborIndices, LocalORCAPlanes, NewVelocity))
 		{
-			// 更新速度
-			SOA.Velocities[InstanceIndex] = NewVelocity;
+			// 并行阶段仅写输出缓冲，避免读写 SOA.Velocities 竞争
+			OutputVelocities[InstanceIndex] = NewVelocity;
 			UpdatedFlags[InstanceIndex] = 1;
 		}
 	});
@@ -139,6 +146,7 @@ void FSkelotRVOSystem::ComputeAvoidance(FSkelotInstancesSOA& SOA, int32 NumInsta
 	{
 		if (UpdatedFlags[InstanceIndex] != 0)
 		{
+			SOA.Velocities[InstanceIndex] = OutputVelocities[InstanceIndex];
 			ProcessedAgents++;
 			TotalVelocityAdjustments++;
 		}
@@ -146,17 +154,18 @@ void FSkelotRVOSystem::ComputeAvoidance(FSkelotInstancesSOA& SOA, int32 NumInsta
 }
 
 bool FSkelotRVOSystem::ComputeAgentAvoidance(const FSkelotInstancesSOA& SOA, int32 InstanceIndex,
+											   const TArray<FVector3f>& InputVelocities,
 											   const FSkelotSpatialGrid& SpatialGrid,
 											   float DeltaTime,
 											   TArray<int32>& LocalNeighborIndices,
 											   TArray<FORCAPlane>& LocalORCAPlanes,
 											   FVector3f& OutNewVelocity)
 {
-	OutNewVelocity = SOA.Velocities[InstanceIndex];
+	OutNewVelocity = InputVelocities[InstanceIndex];
 
 	// 获取当前位置和速度
 	const FVector3d& MyPos3D = SOA.Locations[InstanceIndex];
-	const FVector3f& MyVel3D = SOA.Velocities[InstanceIndex];
+	const FVector3f& MyVel3D = InputVelocities[InstanceIndex];
 
 	// 转换为 3D（XY 平面）
 	FVector3f MyPos(MyPos3D.X, MyPos3D.Y, 0.0f);
@@ -217,7 +226,7 @@ bool FSkelotRVOSystem::ComputeAgentAvoidance(const FSkelotInstancesSOA& SOA, int
 
 		// 获取邻居数据
 		const FVector3d& NeighborPos3D = SOA.Locations[NeighborIdx];
-		const FVector3f& NeighborVel3D = SOA.Velocities[NeighborIdx];
+		const FVector3f& NeighborVel3D = InputVelocities[NeighborIdx];
 
 		FVector3f NeighborPos(NeighborPos3D.X, NeighborPos3D.Y, 0.0f);
 		FVector3f NeighborVel(NeighborVel3D.X, NeighborVel3D.Y, 0.0f);
@@ -242,7 +251,7 @@ bool FSkelotRVOSystem::ComputeAgentAvoidance(const FSkelotInstancesSOA& SOA, int
 	OutNewVelocity = FVector3f(NewVelocity2D.X, NewVelocity2D.Y, 0.0f);
 
 	// 应用抗抖动处理
-	ApplyAntiJitter(InstanceIndex, SOA.Velocities[InstanceIndex], OutNewVelocity, DeltaTime, NumNeighbors);
+	ApplyAntiJitter(InstanceIndex, InputVelocities[InstanceIndex], OutNewVelocity, DeltaTime, NumNeighbors);
 
 	// 确保 Z 轴速度为零（2D 运动）
 	OutNewVelocity.Z = 0.0f;

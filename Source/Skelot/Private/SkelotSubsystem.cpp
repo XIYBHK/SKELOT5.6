@@ -71,7 +71,7 @@ ASkelotWorld* USkelotWorldSubsystem::GetSingleton(const UObject* WorldContextObj
 
 bool USkelotWorldSubsystem::Skelot_AttachMesh(const UObject* WorldContextObject, FSkelotInstanceHandle Handle, const USkeletalMesh* Mesh, FName OrName, int32 OrIndex /*= -1*/, bool bAttach /*= true*/)
 {
-	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject, Handle))
 	{
 		if (Mesh)
 			return Singleton->InstanceAttachMesh_ByAsset(Handle.InstanceIndex, Mesh, bAttach);
@@ -85,33 +85,33 @@ bool USkelotWorldSubsystem::Skelot_AttachMesh(const UObject* WorldContextObject,
 
 void USkelotWorldSubsystem::Skelot_DetachMeshes(const UObject* WorldContextObject, FSkelotInstanceHandle Handle)
 {
-	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject, Handle))
 		Singleton->InstanceDetachMeshes(Handle.InstanceIndex);
 		
 }
 
 void USkelotWorldSubsystem::Skelot_AttachMeshes(const UObject* WorldContextObject, FSkelotInstanceHandle Handle, const TArray<USkeletalMesh*>& Meshes, bool bAttach /*= true*/)
 {
-	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject, Handle))
 		for(USkeletalMesh* SKMesh : Meshes)
 			Singleton->InstanceAttachMesh_ByAsset(Handle.InstanceIndex, SKMesh, bAttach);
 }
 
 void USkelotWorldSubsystem::Skelot_AttachRandomhMeshByGroup(const UObject* WorldContextObject, FSkelotInstanceHandle Handle, FName GroupName)
 {
-	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject, Handle))
 		Singleton->AttachRandomhMeshByGroup(Handle.InstanceIndex, GroupName);
 }
 
 void USkelotWorldSubsystem::Skelot_AttachAllMeshGroups(const UObject* WorldContextObject, FSkelotInstanceHandle Handle)
 {
-	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject, Handle))
 		Singleton->AttachAllMeshGroups(Handle.InstanceIndex);
 }
 
 float USkelotWorldSubsystem::Skelot_PlayAnimation(const UObject* WorldContextObject, FSkelotInstanceHandle H, const FSkelotAnimPlayParams& Params)
 {
-	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject, H))
 		return Singleton->InstancePlayAnimation(H.InstanceIndex, Params);
 
 	return -1;
@@ -119,7 +119,7 @@ float USkelotWorldSubsystem::Skelot_PlayAnimation(const UObject* WorldContextObj
 
 USkelotAnimCollection* USkelotWorldSubsystem::Skelot_GetAnimCollection(const UObject* WorldContextObject, FSkelotInstanceHandle Handle)
 {
-	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject, Handle))
 		return Singleton->GetInstanceAnimCollection(Handle);
 
 	return nullptr;
@@ -128,7 +128,15 @@ USkelotAnimCollection* USkelotWorldSubsystem::Skelot_GetAnimCollection(const UOb
 void USkelotWorldSubsystem::Skelot_SetRenderParam(const UObject* WorldContextObject, FSkelotInstanceHandle Handle, USkelotRenderParams* RenderParams)
 {
 	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject, Handle))
+	{
+		if (!RenderParams)
+		{
+			UE_LOG(LogSkelot, Warning, TEXT("Skelot_SetRenderParam: RenderParams is null."));
+			return;
+		}
+
 		Singleton->SetInstanceRenderParams(Handle.InstanceIndex, RenderParams);
+	}
 }
 
 void USkelotWorldSubsystem::Skelot_SetRenderDesc(const UObject* WorldContextObject, FSkelotInstanceHandle Handle, const FSkelotInstanceRenderDesc& RenderParams)
@@ -200,6 +208,31 @@ float USkelotWorldSubsystem::Skelot_GetSpatialGridCellSize(const UObject* WorldC
 	return 200.0f; // 默认值
 }
 
+void USkelotWorldSubsystem::Skelot_SetLODUpdateFrequencyEnabled(const UObject* WorldContextObject, bool bEnable)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+	{
+		Singleton->SetLODUpdateFrequencyEnabled(bEnable);
+	}
+}
+
+bool USkelotWorldSubsystem::Skelot_IsLODUpdateFrequencyEnabled(const UObject* WorldContextObject)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+	{
+		return Singleton->IsLODUpdateFrequencyEnabled();
+	}
+	return false;
+}
+
+void USkelotWorldSubsystem::Skelot_SetLODDistances(const UObject* WorldContextObject, float MediumDistance, float FarDistance)
+{
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+	{
+		Singleton->SetLODDistances(MediumDistance, FarDistance);
+	}
+}
+
 //////////////////////////////////////////////////////////////////////////
 // PBD Collision API Implementation
 
@@ -256,7 +289,7 @@ void USkelotWorldSubsystem::Skelot_GetAllHandles(const UObject* WorldContextObje
 
 void USkelotWorldSubsystem::SkelotAttachChild(const UObject* WorldContextObject, FSkelotInstanceHandle Parent, FSkelotInstanceHandle Child, FName SocketOrBoneName, const FTransform& ReletiveTransform, bool bKeepWorldTransform)
 {
-	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject, Parent, Child))
 		Singleton->InstanceAttachChild(Parent, Child, SocketOrBoneName, ReletiveTransform, bKeepWorldTransform);
 }
 void USkelotWorldSubsystem::SkelotDetachFromParent(const UObject* WorldContextObject, FSkelotInstanceHandle Handle)
@@ -403,11 +436,20 @@ void USkelotWorldSubsystem::Skelot_SetTimer(const UObject* WorldContextObject, F
 
 FSkelotInstanceHandle USkelotWorldSubsystem::Skelot_CreateInstanceAttached(const UObject* WorldContextObject, USkelotRenderParams* RenderParams, FSkelotInstanceHandle Parent, FName SocketOrBoneName, const FTransform& ReletiveTransform)
 {
-	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
+	if (!RenderParams)
+	{
+		return FSkelotInstanceHandle();
+	}
+
+	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject, Parent))
 	{
 		FSkelotInstanceHandle H = Singleton->CreateInstance(FTransform::Identity, RenderParams);
-		Singleton->InstanceAttachChild(Parent, H, SocketOrBoneName, ReletiveTransform);
-		return H;
+		if (Singleton->InstanceAttachChild(Parent, H, SocketOrBoneName, ReletiveTransform))
+		{
+			return H;
+		}
+
+		Singleton->DestroyInstance(H);
 	}
 
 	return FSkelotInstanceHandle();
@@ -459,7 +501,7 @@ FSkelotInstanceHandle USkelotWorldSubsystem::Skelot_CreateInstance(const UObject
 	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
 	{
 		FSkelotInstanceHandle H = Singleton->CreateInstance(Transform, Params);
-		if(UserObject)
+		if (UserObject && H.IsValid())
 			Singleton->SetInstanceUserObject(H.InstanceIndex, UserObject);
 
 		return H;
@@ -473,6 +515,12 @@ void USkelotWorldSubsystem::Skelot_CreateInstances(const UObject* WorldContextOb
 	OutHandles.Reset();
 	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
 	{
+		if (!RenderParams)
+		{
+			UE_LOG(LogSkelot, Warning, TEXT("Skelot_CreateInstances: RenderParams is null."));
+			return;
+		}
+
 		OutHandles.Reserve(Transforms.Num());
 		for (const FTransform& Transform : Transforms)
 		{
@@ -614,6 +662,7 @@ void USkelotWorldSubsystem::Skelot_SetInstanceVelocities(const UObject* WorldCon
 	{
 		if (Handles.Num() != Velocities.Num())
 		{
+			UE_LOG(LogSkelot, Warning, TEXT("Skelot_SetInstanceVelocities: size mismatch (%d vs %d)."), Handles.Num(), Velocities.Num());
 			return;
 		}
 		Singleton->SetInstanceVelocities(Handles, Velocities);
@@ -626,6 +675,7 @@ void USkelotWorldSubsystem::Skelot_SetInstanceVelocitiesByIndex(const UObject* W
 	{
 		if (InstanceIndices.Num() != Velocities.Num())
 		{
+			UE_LOG(LogSkelot, Warning, TEXT("Skelot_SetInstanceVelocitiesByIndex: size mismatch (%d vs %d)."), InstanceIndices.Num(), Velocities.Num());
 			return;
 		}
 		Singleton->SetInstanceVelocities(InstanceIndices, Velocities);

@@ -57,7 +57,7 @@ void FSkelotEdModule::StartupModule()
 
 void FSkelotEdModule::ShutdownModule()
 {
-	FPropertyEditorModule& PropertyModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>(Name_PropertyEditor);
+	FPropertyEditorModule* PropertyModule = FModuleManager::GetModulePtr<FPropertyEditorModule>(Name_PropertyEditor);
 	//PropertyModule.UnregisterCustomClassLayout(TEXT("SkelotAnimSet"));
 
 	//PropertyModule.UnregisterCustomPropertyTypeLayout(TEXT("SkelotSequenceDef"));
@@ -81,6 +81,8 @@ void FSkelotEdModule::ShutdownModule()
 		}
 	}
 	RegisteredAssetTypeActions.Empty();
+
+	(void)PropertyModule;
 }
 
 
