@@ -161,24 +161,28 @@ float USkelotWorldSubsystem::Skelot_GetCustomDataFloat(const UObject* WorldConte
 
 void USkelotWorldSubsystem::SkelotQueryLocationOverlappingSphere(const UObject* WorldContextObject, const FVector& Center, float Radius, TArray<FSkelotInstanceHandle>& Instances)
 {
+	Instances.Reset();
 	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
 		Singleton->QueryLocationOverlappingSphere(Center, Radius, Instances);
 }
 
 void USkelotWorldSubsystem::SkelotQueryLocationOverlappingSphereWithMask(const UObject* WorldContextObject, const FVector& Center, float Radius, uint8 CollisionMask, TArray<FSkelotInstanceHandle>& Instances)
 {
+	Instances.Reset();
 	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
 		Singleton->QueryLocationOverlappingSphereWithMask(Center, Radius, Instances, CollisionMask);
 }
 
 void USkelotWorldSubsystem::SkelotQueryLocationOverlappingBox(const UObject* WorldContextObject, const FVector& BoxCenter, const FVector& BoxExtent, TArray<FSkelotInstanceHandle>& Instances)
 {
+	Instances.Reset();
 	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
 		Singleton->QueryLocationOverlappingBox(BoxCenter, BoxExtent, Instances);
 }
 
 void USkelotWorldSubsystem::SkelotQueryLocationOverlappingBoxWithMask(const UObject* WorldContextObject, const FVector& BoxCenter, const FVector& BoxExtent, uint8 CollisionMask, TArray<FSkelotInstanceHandle>& Instances)
 {
+	Instances.Reset();
 	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
 		Singleton->QueryLocationOverlappingBoxWithMask(BoxCenter, BoxExtent, Instances, CollisionMask);
 }
@@ -485,7 +489,10 @@ void USkelotWorldSubsystem::Skelot_SetInstanceCollisionChannel(const UObject* Wo
 {
 	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
 	{
-		Singleton->SetInstanceCollisionChannel(InstanceIndex, static_cast<uint8>(Channel));
+		if (InstanceIndex >= 0 && InstanceIndex < Singleton->GetNumInstance() && Singleton->IsInstanceAlive(InstanceIndex))
+		{
+			Singleton->SetInstanceCollisionChannel(InstanceIndex, static_cast<uint8>(Channel));
+		}
 	}
 }
 
@@ -493,7 +500,10 @@ ESkelotCollisionChannel USkelotWorldSubsystem::Skelot_GetInstanceCollisionChanne
 {
 	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
 	{
-		return static_cast<ESkelotCollisionChannel>(Singleton->GetInstanceCollisionChannel(InstanceIndex));
+		if (InstanceIndex >= 0 && InstanceIndex < Singleton->GetNumInstance() && Singleton->IsInstanceAlive(InstanceIndex))
+		{
+			return static_cast<ESkelotCollisionChannel>(Singleton->GetInstanceCollisionChannel(InstanceIndex));
+		}
 	}
 	return ESkelotCollisionChannel::Channel0;
 }
@@ -519,7 +529,10 @@ void USkelotWorldSubsystem::Skelot_SetInstanceCollisionMask(const UObject* World
 {
 	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
 	{
-		Singleton->SetInstanceCollisionMask(InstanceIndex, Mask);
+		if (InstanceIndex >= 0 && InstanceIndex < Singleton->GetNumInstance() && Singleton->IsInstanceAlive(InstanceIndex))
+		{
+			Singleton->SetInstanceCollisionMask(InstanceIndex, Mask);
+		}
 	}
 }
 
@@ -527,7 +540,10 @@ uint8 USkelotWorldSubsystem::Skelot_GetInstanceCollisionMask(const UObject* Worl
 {
 	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
 	{
-		return Singleton->GetInstanceCollisionMask(InstanceIndex);
+		if (InstanceIndex >= 0 && InstanceIndex < Singleton->GetNumInstance() && Singleton->IsInstanceAlive(InstanceIndex))
+		{
+			return Singleton->GetInstanceCollisionMask(InstanceIndex);
+		}
 	}
 	return SkelotCollision::DefaultCollisionMask;
 }
@@ -596,6 +612,10 @@ void USkelotWorldSubsystem::Skelot_SetInstanceVelocities(const UObject* WorldCon
 {
 	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
 	{
+		if (Handles.Num() != Velocities.Num())
+		{
+			return;
+		}
 		Singleton->SetInstanceVelocities(Handles, Velocities);
 	}
 }
@@ -604,6 +624,10 @@ void USkelotWorldSubsystem::Skelot_SetInstanceVelocitiesByIndex(const UObject* W
 {
 	if (ASkelotWorld* Singleton = GetSingleton(WorldContextObject))
 	{
+		if (InstanceIndices.Num() != Velocities.Num())
+		{
+			return;
+		}
 		Singleton->SetInstanceVelocities(InstanceIndices, Velocities);
 	}
 }

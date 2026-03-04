@@ -282,6 +282,10 @@ public:
 
 		for (int32 InstanceIndex = 0; InstanceIndex < HandleAllocator.GetMaxSize(); InstanceIndex++)
 		{
+			// Distance-based update throttling for far instances.
+			if (!ShouldUpdateInstanceLOD(InstanceIndex))
+				continue;
+
 			UpdateAnimation(InstanceIndex, DeltaSeconds);
 		}
 
@@ -1019,6 +1023,9 @@ void ASkelotWorld::Tick(float DeltaSeconds)
 	// 重建空间网格（用于高效的空间查询）
 	RebuildSpatialGrid();
 
+	// 执行RVO避障计算（用于速度修正）
+	ComputeRVOAvoidance(DeltaSeconds);
+
 	// 执行PBD碰撞求解（用于实例间碰撞避让）
 	SolvePBDCollisions(DeltaSeconds);
 
@@ -1239,16 +1246,30 @@ void ASkelotWorld::SetInstanceVelocity(FSkelotInstanceHandle H, const FVector3f&
 
 void ASkelotWorld::SetInstanceVelocities(const TArray<int32>& InstanceIndices, const TArray<FVector3f>& Velocities)
 {
-	check(InstanceIndices.Num() == Velocities.Num());
+	if (InstanceIndices.Num() != Velocities.Num())
+	{
+		UE_LOG(LogSkelot, Warning, TEXT("SetInstanceVelocities(Index): size mismatch (%d vs %d)"), InstanceIndices.Num(), Velocities.Num());
+		return;
+	}
+
 	for (int32 i = 0; i < InstanceIndices.Num(); i++)
 	{
-		SOA.Velocities[InstanceIndices[i]] = Velocities[i];
+		const int32 InstanceIndex = InstanceIndices[i];
+		if (InstanceIndex >= 0 && InstanceIndex < GetNumInstance() && IsInstanceAlive(InstanceIndex))
+		{
+			SOA.Velocities[InstanceIndex] = Velocities[i];
+		}
 	}
 }
 
 void ASkelotWorld::SetInstanceVelocities(const TArray<FSkelotInstanceHandle>& Handles, const TArray<FVector3f>& Velocities)
 {
-	check(Handles.Num() == Velocities.Num());
+	if (Handles.Num() != Velocities.Num())
+	{
+		UE_LOG(LogSkelot, Warning, TEXT("SetInstanceVelocities(Handle): size mismatch (%d vs %d)"), Handles.Num(), Velocities.Num());
+		return;
+	}
+
 	for (int32 i = 0; i < Handles.Num(); i++)
 	{
 		if (IsHandleValid(Handles[i]))
@@ -1413,7 +1434,7 @@ bool ASkelotWorld::InstanceAttachMesh_ByName(int32 InstanceIndex, FName Name, bo
 	if (SOA.ClusterData[InstanceIndex].DescIdx != -1 && !Name.IsNone())
 	{
 		int32 SubMeshIdx = GetInstanceDesc(InstanceIndex).IndexOfMesh(Name);
-		if (!SubMeshIdx)
+		if (SubMeshIdx == -1)
 		{
 			UE_LOGFMT(LogSkelot, Warning, "submesh name {0} not valid!", Name);
 			return false;
@@ -2132,6 +2153,8 @@ void ASkelotWorld::Internal_CallOnAnimationNotify()
 
 void ASkelotWorld::QueryLocationOverlappingSphere(const FVector& Center, float Radius, TArray<FSkelotInstanceHandle>& Instances)
 {
+	Instances.Reset();
+
 	// 使用空间网格优化查询
 	if (bEnableSpatialGrid && SpatialGrid.GetNumCells() > 0)
 	{
@@ -2162,6 +2185,8 @@ void ASkelotWorld::QueryLocationOverlappingSphere(const FVector& Center, float R
 
 void ASkelotWorld::QueryLocationOverlappingSphereWithMask(const FVector& Center, float Radius, TArray<FSkelotInstanceHandle>& OutInstances, uint8 CollisionMask)
 {
+	OutInstances.Reset();
+
 	// 使用空间网格优化查询
 	if (bEnableSpatialGrid && SpatialGrid.GetNumCells() > 0)
 	{
@@ -2207,6 +2232,8 @@ void ASkelotWorld::QueryLocationOverlappingBox(const FVector& BoxCenter, const F
 
 void ASkelotWorld::QueryLocationOverlappingBoxWithMask(const FVector& BoxCenter, const FVector& BoxExtent, TArray<FSkelotInstanceHandle>& OutInstances, uint8 CollisionMask)
 {
+	OutInstances.Reset();
+
 	// 使用空间网格优化查询
 	if (bEnableSpatialGrid && SpatialGrid.GetNumCells() > 0)
 	{
@@ -2258,6 +2285,17 @@ void ASkelotWorld::SetSpatialGridCellSize(float CellSize)
 float ASkelotWorld::GetSpatialGridCellSize() const
 {
 	return SpatialGrid.GetCellSize();
+}
+
+void ASkelotWorld::SetSpatialGridFrameStride(int32 Stride)
+{
+	SpatialGridFrameStride = FMath::Clamp(Stride, 1, 8);
+	SpatialGrid.SetFrameStride(SpatialGridFrameStride);
+}
+
+int32 ASkelotWorld::GetSpatialGridFrameStride() const
+{
+	return SpatialGrid.GetFrameStride();
 }
 
 void ASkelotWorld::RebuildSpatialGrid()

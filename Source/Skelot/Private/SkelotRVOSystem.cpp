@@ -259,7 +259,7 @@ void FSkelotRVOSystem::ComputeORCAPlane(const FVector3f& PosA, const FVector3f& 
 		// 计算截止圆的切线方向
 		float SqrtDistSq = FMath::Sqrt(DistSq);
 		float S = CombinedRadius / SqrtDistSq;
-		float C = FMath::Sqrt(FMath::Max(0.0f - S * S));
+		float C = FMath::Sqrt(FMath::Max(0.0f, 1.0f - S * S));
 
 		// 计算从 A 到 B 的方向
 		FVector2f Direction = RelPos2D / SqrtDistSq;
