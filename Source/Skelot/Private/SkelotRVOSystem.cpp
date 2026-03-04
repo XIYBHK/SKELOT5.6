@@ -4,6 +4,7 @@
 #include "SkelotSpatialGrid.h"
 #include "SkelotPBDPlane.h"
 #include "SkelotWorld.h"
+#include "Async/ParallelFor.h"
 
 // 数学常数
 static constexpr float RVO_EPSILON = 0.00001f;
@@ -15,8 +16,6 @@ FSkelotRVOSystem::FSkelotRVOSystem()
 	, CurrentCollisionRadius(60.0f)
 	, FrameCounter(0)
 {
-	NeighborIndices.Reserve(64);
-	ORCAPlanes.Reserve(32);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -51,22 +50,36 @@ void FSkelotRVOSystem::ResetStats()
 
 void FSkelotRVOSystem::ResetAgentData()
 {
-	AgentDataMap.Empty();
+	AgentDataArray.Empty();
 }
 
 FRVOAgentData* FSkelotRVOSystem::GetAgentData(int32 InstanceIndex)
 {
-	return AgentDataMap.Find(InstanceIndex);
+	return AgentDataArray.IsValidIndex(InstanceIndex) ? &AgentDataArray[InstanceIndex] : nullptr;
 }
 
 const FRVOAgentData* FSkelotRVOSystem::GetAgentData(int32 InstanceIndex) const
 {
-	return AgentDataMap.Find(InstanceIndex);
+	return AgentDataArray.IsValidIndex(InstanceIndex) ? &AgentDataArray[InstanceIndex] : nullptr;
 }
 
 FRVOAgentData& FSkelotRVOSystem::GetOrCreateAgentData(int32 InstanceIndex)
 {
-	return AgentDataMap.FindOrAdd(InstanceIndex);
+	check(AgentDataArray.IsValidIndex(InstanceIndex));
+	return AgentDataArray[InstanceIndex];
+}
+
+void FSkelotRVOSystem::EnsureAgentDataCapacity(int32 NumInstances)
+{
+	if (AgentDataArray.Num() < NumInstances)
+	{
+		const int32 OldNum = AgentDataArray.Num();
+		AgentDataArray.SetNum(NumInstances);
+		for (int32 i = OldNum; i < NumInstances; ++i)
+		{
+			AgentDataArray[i] = FRVOAgentData();
+		}
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -88,31 +101,44 @@ void FSkelotRVOSystem::ComputeAvoidance(FSkelotInstancesSOA& SOA, int32 NumInsta
 
 	// 重置统计
 	ResetStats();
+	EnsureAgentDataCapacity(NumInstances);
 
 	// 分帧更新检查
 	FrameCounter = (FrameCounter + 1) % Config.FrameStride;
+	TArray<uint8> UpdatedFlags;
+	UpdatedFlags.SetNumZeroed(NumInstances);
 
-	// 遍历所有有效实例
-	for (int32 InstanceIndex = 0; InstanceIndex < NumInstances; InstanceIndex++)
+	ParallelFor(NumInstances, [&](int32 InstanceIndex)
 	{
 		// 跳过已销毁的实例
 		if (SOA.Slots[InstanceIndex].bDestroyed)
 		{
-			continue;
+			return;
 		}
 
 		// 分帧更新：只处理当前帧对应的实例
 		if (Config.FrameStride > 1 && (InstanceIndex % Config.FrameStride) != FrameCounter)
 		{
-			continue;
+			return;
 		}
+
+		TArray<int32> LocalNeighborIndices;
+		TArray<FORCAPlane> LocalORCAPlanes;
 
 		// 计算避障
 		FVector3f NewVelocity;
-		if (ComputeAgentAvoidance(SOA, InstanceIndex, SpatialGrid, DeltaTime, NewVelocity))
+		if (ComputeAgentAvoidance(SOA, InstanceIndex, SpatialGrid, DeltaTime, LocalNeighborIndices, LocalORCAPlanes, NewVelocity))
 		{
 			// 更新速度
 			SOA.Velocities[InstanceIndex] = NewVelocity;
+			UpdatedFlags[InstanceIndex] = 1;
+		}
+	});
+
+	for (int32 InstanceIndex = 0; InstanceIndex < NumInstances; ++InstanceIndex)
+	{
+		if (UpdatedFlags[InstanceIndex] != 0)
+		{
 			ProcessedAgents++;
 			TotalVelocityAdjustments++;
 		}
@@ -122,6 +148,8 @@ void FSkelotRVOSystem::ComputeAvoidance(FSkelotInstancesSOA& SOA, int32 NumInsta
 bool FSkelotRVOSystem::ComputeAgentAvoidance(const FSkelotInstancesSOA& SOA, int32 InstanceIndex,
 											   const FSkelotSpatialGrid& SpatialGrid,
 											   float DeltaTime,
+											   TArray<int32>& LocalNeighborIndices,
+											   TArray<FORCAPlane>& LocalORCAPlanes,
 											   FVector3f& OutNewVelocity)
 {
 	OutNewVelocity = SOA.Velocities[InstanceIndex];
@@ -151,23 +179,23 @@ bool FSkelotRVOSystem::ComputeAgentAvoidance(const FSkelotInstancesSOA& SOA, int
 	MaxSpeed = FMath::Max(MaxSpeed, Config.MinSpeed);
 
 	// 使用空间网格查询邻居
-	NeighborIndices.Reset();
-	SpatialGrid.QuerySphere(FVector(MyPos3D), Config.NeighborRadius, NeighborIndices);
+	LocalNeighborIndices.Reset();
+	SpatialGrid.QuerySphere(FVector(MyPos3D), Config.NeighborRadius, LocalNeighborIndices);
 
 	// 限制邻居数量
-	int32 NumNeighbors = FMath::Min(NeighborIndices.Num(), Config.MaxNeighbors);
+	int32 NumNeighbors = FMath::Min(LocalNeighborIndices.Num(), Config.MaxNeighbors);
 
 	// 获取或创建代理数据
 	FRVOAgentData& AgentData = GetOrCreateAgentData(InstanceIndex);
 	AgentData.CurrentNeighborCount = NumNeighbors;
 
 	// 构建 ORCA 平面
-	ORCAPlanes.Reset();
+	LocalORCAPlanes.Reset();
 	float CombinedRadius = CurrentCollisionRadius * 2.0f;
 
 	for (int32 i = 0; i < NumNeighbors; i++)
 	{
-		int32 NeighborIdx = NeighborIndices[i];
+		int32 NeighborIdx = LocalNeighborIndices[i];
 
 		// 跳过自己
 		if (NeighborIdx == InstanceIndex)
@@ -197,12 +225,12 @@ bool FSkelotRVOSystem::ComputeAgentAvoidance(const FSkelotInstancesSOA& SOA, int
 		// 构建 ORCA 平面
 		FORCAPlane Plane;
 		ComputeORCAPlane(MyPos, MyVel, NeighborPos, NeighborVel, CombinedRadius, Plane);
-		ORCAPlanes.Add(Plane);
+		LocalORCAPlanes.Add(Plane);
 	}
 
 	// 使用线性规划求解最优速度
 	FVector2f NewVelocity2D;
-	bool bFoundSolution = LinearProgram(ORCAPlanes, PreferredVelocity, MaxSpeed, NewVelocity2D);
+	bool bFoundSolution = LinearProgram(LocalORCAPlanes, PreferredVelocity, MaxSpeed, NewVelocity2D);
 
 	if (!bFoundSolution)
 	{

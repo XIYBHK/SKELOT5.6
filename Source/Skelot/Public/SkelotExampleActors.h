@@ -495,13 +495,61 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO配置", meta = (DisplayName = "邻居半径"))
 	float RVONeighborRadius = 300.0f;
 
+	/** PBD 迭代次数 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PBD配置", meta = (DisplayName = "迭代次数", ClampMin = "1", ClampMax = "8"))
+	int32 PBDIterationCount = 3;
+
+	/** PBD 最大邻居数 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PBD配置", meta = (DisplayName = "最大邻居数", ClampMin = "8", ClampMax = "256"))
+	int32 PBDMaxNeighbors = 64;
+
+	/** RVO 最大邻居数 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO配置", meta = (DisplayName = "最大邻居数", ClampMin = "4", ClampMax = "64"))
+	int32 RVOMaxNeighbors = 16;
+
+	/** RVO 分帧步长 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO配置", meta = (DisplayName = "分帧步长", ClampMin = "1", ClampMax = "8"))
+	int32 RVOFrameStride = 1;
+
 	/** 是否显示HUD统计 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "调试", meta = (DisplayName = "显示HUD"))
 	bool bShowHUD = true;
 
+	/** 开始测试时是否自动启动 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "测试流程", meta = (DisplayName = "自动开始测试"))
+	bool bAutoStartOnBeginPlay = false;
+
+	/** 预热时长（秒），预热阶段不计入最终统计 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "测试流程", meta = (DisplayName = "预热时长", ClampMin = "0.0", ClampMax = "120.0"))
+	float WarmupSeconds = 3.0f;
+
+	/** 正式采样时长（秒），到时自动停止测试；<=0 表示不自动停止 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "测试流程", meta = (DisplayName = "采样时长", ClampMin = "0.0", ClampMax = "3600.0"))
+	float MeasurementSeconds = 30.0f;
+
+	/** 是否启用 LOD 更新频率 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LOD配置", meta = (DisplayName = "启用LOD更新频率"))
+	bool bEnableLODUpdateFrequency = false;
+
+	/** LOD 中距离阈值（厘米） */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LOD配置", meta = (DisplayName = "中距离阈值", ClampMin = "100.0"))
+	float LODMediumDistance = 2000.0f;
+
+	/** LOD 远距离阈值（厘米） */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LOD配置", meta = (DisplayName = "远距离阈值", ClampMin = "200.0"))
+	float LODFarDistance = 5000.0f;
+
 	/** HUD文字大小 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "调试", meta = (DisplayName = "HUD文字大小"))
 	float HUDTextSize = 1.5f;
+
+	/** 方向切换间隔（秒） */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "移动", meta = (DisplayName = "方向切换间隔", ClampMin = "0.1", ClampMax = "60.0"))
+	float DirectionChangeInterval = 5.0f;
+
+	/** 随机种子（保证可复现实验） */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "移动", meta = (DisplayName = "随机种子"))
+	int32 RandomSeed = 12345;
 
 	/** 开始测试的键盘键位 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "交互", meta = (DisplayName = "开始测试键位"))
@@ -611,6 +659,21 @@ private:
 	/** 上一次帧时间 */
 	double LastFrameTime = 0.0;
 
+	/** 是否处于预热阶段 */
+	bool bInWarmup = false;
+
+	/** 预热开始时间 */
+	double WarmupStartTime = 0.0;
+
+	/** 正式采样开始时间 */
+	double MeasurementStartTime = 0.0;
+
+	/** 方向切换计时器 */
+	float DirectionChangeTimer = 0.0f;
+
+	/** 当前方向数组 */
+	TArray<FVector> TargetDirections;
+
 	/** 处理键盘输入 */
 	void HandleKeyboardInput();
 
@@ -625,4 +688,10 @@ private:
 
 	/** 更新实例移动 */
 	void UpdateInstanceMovement(float DeltaTime);
+
+	/** 重置统计数据 */
+	void ResetStats();
+
+	/** 重新生成移动方向 */
+	void RegenerateTargetDirections();
 };

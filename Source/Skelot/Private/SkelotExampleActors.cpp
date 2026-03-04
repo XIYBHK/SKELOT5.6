@@ -743,6 +743,11 @@ void ASkelotExampleStressTest::BeginPlay()
 
 	SkelotWorld = USkelotWorldSubsystem::GetSingleton(this);
 	LastFrameTime = FPlatformTime::Seconds();
+
+	if (bAutoStartOnBeginPlay)
+	{
+		StartTest();
+	}
 }
 
 void ASkelotExampleStressTest::Tick(float DeltaTime)
@@ -753,13 +758,13 @@ void ASkelotExampleStressTest::Tick(float DeltaTime)
 
 	if (bTestRunning)
 	{
-		UpdateFPSStats(DeltaTime);
-
 		// 根据测试模式更新
 		if (TestMode >= 1) // 移动模式
 		{
 			UpdateInstanceMovement(DeltaTime);
 		}
+
+		UpdateFPSStats(DeltaTime);
 
 		if (bShowHUD)
 		{
@@ -781,15 +786,21 @@ void ASkelotExampleStressTest::StartTest()
 		return;
 	}
 
-	// 重置统计
-	CurrentFPS = 0.0f;
-	AverageFPS = 0.0f;
-	MinFPS = FLT_MAX;
-	MaxFPS = 0.0f;
-	FPSAccumulator = 0.0f;
-	FPSFrameCount = 0;
-	FrameCount = 0;
-	TestStartTime = FPlatformTime::Seconds();
+	if (InstanceHandles.Num() > 0)
+	{
+		USkelotWorldSubsystem::Skelot_DestroyInstances(this, InstanceHandles);
+		InstanceHandles.Empty();
+	}
+
+	ResetStats();
+	const double Now = FPlatformTime::Seconds();
+	TestStartTime = Now;
+	WarmupStartTime = Now;
+	MeasurementStartTime = Now;
+	bInWarmup = WarmupSeconds > 0.0f;
+	LastFrameTime = Now;
+	DirectionChangeTimer = 0.0f;
+	TargetDirections.Empty();
 
 	// 应用配置
 	ApplyConfigs();
@@ -801,6 +812,7 @@ void ASkelotExampleStressTest::StartTest()
 	// 使用网格布局生成，更均匀
 	int32 GridSize = FMath::CeilToInt(FMath::Sqrt(static_cast<float>(InstanceCount)));
 	float GridSpacing = SpawnRadius * 2.0f / GridSize;
+	FRandomStream SpawnRandom(RandomSeed);
 
 	for (int32 i = 0; i < InstanceCount; ++i)
 	{
@@ -814,7 +826,7 @@ void ASkelotExampleStressTest::StartTest()
 		);
 
 		// 添加小随机偏移
-		Location += FVector(FMath::FRand() * 10.0f, FMath::FRand() * 10.0f, 0.0f);
+		Location += FVector(SpawnRandom.FRandRange(-10.0f, 10.0f), SpawnRandom.FRandRange(-10.0f, 10.0f), 0.0f);
 
 		Transforms.Add(FTransform(Location));
 	}
@@ -837,7 +849,8 @@ void ASkelotExampleStressTest::StartTest()
 	}
 
 	bTestRunning = true;
-	UE_LOG(LogTemp, Log, TEXT("Skelot Stress Test Started: %d instances, Mode %d"), InstanceCount, TestMode);
+	UE_LOG(LogTemp, Log, TEXT("Skelot Stress Test Started: Instances=%d, Mode=%d, Warmup=%.1fs, Measure=%.1fs"),
+		InstanceCount, TestMode, WarmupSeconds, MeasurementSeconds);
 }
 
 void ASkelotExampleStressTest::StopTest()
@@ -850,12 +863,14 @@ void ASkelotExampleStressTest::StopTest()
 	// 销毁所有实例
 	USkelotWorldSubsystem::Skelot_DestroyInstances(this, InstanceHandles);
 	InstanceHandles.Empty();
+	TargetDirections.Empty();
 
 	bTestRunning = false;
+	bInWarmup = false;
 
 	double TestDuration = FPlatformTime::Seconds() - TestStartTime;
-	UE_LOG(LogTemp, Log, TEXT("Skelot Stress Test Stopped: Duration=%.2fs, AvgFPS=%.2f, MinFPS=%.2f, MaxFPS=%.2f"),
-		TestDuration, AverageFPS, MinFPS, MaxFPS);
+	UE_LOG(LogTemp, Log, TEXT("Skelot Stress Test Stopped: Duration=%.2fs, AvgFPS=%.2f, MinFPS=%.2f, MaxFPS=%.2f, AvgFrame=%.2fms"),
+		TestDuration, AverageFPS, MinFPS == FLT_MAX ? 0.0f : MinFPS, MaxFPS, AverageFrameTimeMs);
 }
 
 void ASkelotExampleStressTest::CycleTestMode()
@@ -918,6 +933,8 @@ void ASkelotExampleStressTest::HandleKeyboardInput()
 
 void ASkelotExampleStressTest::UpdateFPSStats(float DeltaTime)
 {
+	(void)DeltaTime;
+
 	// 计算当前 FPS
 	double CurrentTime = FPlatformTime::Seconds();
 	float ActualDeltaTime = static_cast<float>(CurrentTime - LastFrameTime);
@@ -932,6 +949,18 @@ void ASkelotExampleStressTest::UpdateFPSStats(float DeltaTime)
 	{
 		CurrentFPS = 0.0f;
 		FrameTimeMs = 0.0f;
+	}
+
+	// 预热阶段不计入统计
+	if (bInWarmup)
+	{
+		if ((CurrentTime - WarmupStartTime) >= WarmupSeconds)
+		{
+			bInWarmup = false;
+			MeasurementStartTime = CurrentTime;
+			ResetStats();
+		}
+		return;
 	}
 
 	// 更新统计
@@ -949,6 +978,11 @@ void ASkelotExampleStressTest::UpdateFPSStats(float DeltaTime)
 	{
 		MinFPS = FMath::Min(MinFPS, CurrentFPS);
 		MaxFPS = FMath::Max(MaxFPS, CurrentFPS);
+	}
+
+	if (MeasurementSeconds > 0.0f && (CurrentTime - MeasurementStartTime) >= MeasurementSeconds)
+	{
+		StopTest();
 	}
 }
 
@@ -977,6 +1011,7 @@ void ASkelotExampleStressTest::DrawHUD()
 	// 标题
 	Lines.Add(TEXT("=== Skelot 性能测试 ==="));
 	Lines.Add(FString::Printf(TEXT("测试模式: %s"), *GetTestModeName()));
+	Lines.Add(FString::Printf(TEXT("阶段: %s"), bInWarmup ? TEXT("预热中") : TEXT("正式采样")));
 	Lines.Add(FString::Printf(TEXT("实例数量: %d"), InstanceHandles.Num()));
 	Lines.Add(TEXT(""));
 
@@ -994,7 +1029,9 @@ void ASkelotExampleStressTest::DrawHUD()
 
 	// 测试时长
 	double TestDuration = FPlatformTime::Seconds() - TestStartTime;
+	double MeasureDuration = bInWarmup ? 0.0 : (FPlatformTime::Seconds() - MeasurementStartTime);
 	Lines.Add(FString::Printf(TEXT("测试时长: %.1f 秒"), TestDuration));
+	Lines.Add(FString::Printf(TEXT("采样时长: %.1f / %.1f 秒"), MeasureDuration, MeasurementSeconds));
 	Lines.Add(FString::Printf(TEXT("总帧数: %lld"), FrameCount));
 
 	// 操作提示
@@ -1025,13 +1062,20 @@ void ASkelotExampleStressTest::ApplyConfigs()
 	FSkelotPBDConfig PBDConfig = SkelotWorld->GetPBDConfig();
 	PBDConfig.bEnablePBD = (TestMode >= 2);
 	PBDConfig.CollisionRadius = PBDCollisionRadius;
+	PBDConfig.IterationCount = PBDIterationCount;
+	PBDConfig.MaxNeighbors = PBDMaxNeighbors;
 	SkelotWorld->SetPBDConfig(PBDConfig);
 
 	// RVO 配置
 	FSkelotRVOConfig RVOConfig = SkelotWorld->GetRVOConfig();
 	RVOConfig.bEnableRVO = (TestMode >= 3);
 	RVOConfig.NeighborRadius = RVONeighborRadius;
+	RVOConfig.MaxNeighbors = RVOMaxNeighbors;
+	RVOConfig.FrameStride = RVOFrameStride;
 	SkelotWorld->SetRVOConfig(RVOConfig);
+
+	SkelotWorld->SetLODUpdateFrequencyEnabled(bEnableLODUpdateFrequency);
+	SkelotWorld->SetLODDistances(LODMediumDistance, LODFarDistance);
 }
 
 void ASkelotExampleStressTest::UpdateInstanceMovement(float DeltaTime)
@@ -1041,35 +1085,19 @@ void ASkelotExampleStressTest::UpdateInstanceMovement(float DeltaTime)
 		return;
 	}
 
-	// 简单的随机移动 - 每个实例向随机方向移动
-	// 使用固定随机种子保证可重复性
-	FRandomStream RandomStream(12345);
-
-	// 每隔一段时间改变移动方向
-	static float DirectionChangeTimer = 0.0f;
-	static TArray<FVector> TargetDirections;
-
 	DirectionChangeTimer += DeltaTime;
 
-	if (DirectionChangeTimer > 5.0f || TargetDirections.Num() != InstanceHandles.Num())
+	if (DirectionChangeTimer > DirectionChangeInterval || TargetDirections.Num() != InstanceHandles.Num())
 	{
-		// 重新生成目标方向
-		TargetDirections.Empty();
-		TargetDirections.Reserve(InstanceHandles.Num());
-
-		for (int32 i = 0; i < InstanceHandles.Num(); ++i)
-		{
-			FVector Dir = RandomStream.VRand();
-			Dir.Z = 0;
-			Dir.Normalize();
-			TargetDirections.Add(Dir);
-		}
-
+		RegenerateTargetDirections();
 		DirectionChangeTimer = 0.0f;
 	}
 
-	// 批量更新速度（性能优化）
-	const int32 BatchSize = 1000;
+	TArray<int32> Indices;
+	TArray<FVector3f> Velocities;
+	Indices.Reserve(InstanceHandles.Num());
+	Velocities.Reserve(InstanceHandles.Num());
+
 	for (int32 i = 0; i < InstanceHandles.Num(); ++i)
 	{
 		if (!SkelotWorld->IsHandleValid(InstanceHandles[i]))
@@ -1100,7 +1128,8 @@ void ASkelotExampleStressTest::UpdateInstanceMovement(float DeltaTime)
 
 		// 设置速度
 		FVector3f Velocity = FVector3f(MoveDir * MoveSpeed);
-		SkelotWorld->SetInstanceVelocity(InstanceHandles[i].InstanceIndex, Velocity);
+		Indices.Add(InstanceHandles[i].InstanceIndex);
+		Velocities.Add(Velocity);
 
 		// 更新位置
 		FVector NewLoc = CurrentLoc + MoveDir * MoveSpeed * DeltaTime;
@@ -1112,5 +1141,43 @@ void ASkelotExampleStressTest::UpdateInstanceMovement(float DeltaTime)
 			FQuat TargetRotation = FRotationMatrix::MakeFromX(MoveDir).Rotator().Quaternion();
 			SkelotWorld->SetInstanceRotation(InstanceHandles[i].InstanceIndex, FQuat4f(TargetRotation));
 		}
+	}
+
+	if (Indices.Num() > 0 && Velocities.Num() == Indices.Num())
+	{
+		SkelotWorld->SetInstanceVelocities(Indices, Velocities);
+	}
+}
+
+void ASkelotExampleStressTest::ResetStats()
+{
+	CurrentFPS = 0.0f;
+	AverageFPS = 0.0f;
+	MinFPS = FLT_MAX;
+	MaxFPS = 0.0f;
+	FPSAccumulator = 0.0f;
+	FPSFrameCount = 0;
+	FrameCount = 0;
+	FrameTimeMs = 0.0f;
+	AverageFrameTimeMs = 0.0f;
+}
+
+void ASkelotExampleStressTest::RegenerateTargetDirections()
+{
+	TargetDirections.Reset();
+	TargetDirections.Reserve(InstanceHandles.Num());
+
+	const int32 SeedOffset = static_cast<int32>(FrameCount % 1000000);
+	FRandomStream RandomStream(RandomSeed + SeedOffset);
+
+	for (int32 i = 0; i < InstanceHandles.Num(); ++i)
+	{
+		FVector Dir = RandomStream.VRand();
+		Dir.Z = 0.0f;
+		if (!Dir.Normalize())
+		{
+			Dir = FVector::ForwardVector;
+		}
+		TargetDirections.Add(Dir);
 	}
 }

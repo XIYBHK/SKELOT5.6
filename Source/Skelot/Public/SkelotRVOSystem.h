@@ -118,14 +118,8 @@ private:
 	/** 抗抖动配置 */
 	FSkelotAntiJitterConfig AntiJitterConfig;
 
-	/** 代理数据映射（InstanceIndex -> AgentData） */
-	TMap<int32, FRVOAgentData> AgentDataMap;
-
-	/** 临时数组：邻居索引 */
-	TArray<int32> NeighborIndices;
-
-	/** 临时数组：ORCA 平面 */
-	TArray<FORCAPlane> ORCAPlanes;
+	/** 代理数据数组（索引 = InstanceIndex，连续内存布局） */
+	TArray<FRVOAgentData> AgentDataArray;
 
 	/** 统计：处理的代理数量 */
 	int32 ProcessedAgents;
@@ -152,6 +146,8 @@ private:
 	bool ComputeAgentAvoidance(const FSkelotInstancesSOA& SOA, int32 InstanceIndex,
 							   const FSkelotSpatialGrid& SpatialGrid,
 							   float DeltaTime,
+							   TArray<int32>& LocalNeighborIndices,
+							   TArray<FORCAPlane>& LocalORCAPlanes,
 							   FVector3f& OutNewVelocity);
 
 	/**
@@ -329,4 +325,5 @@ private:
 	 * 获取或创建代理数据
 	 */
 	FRVOAgentData& GetOrCreateAgentData(int32 InstanceIndex);
+	void EnsureAgentDataCapacity(int32 NumInstances);
 };

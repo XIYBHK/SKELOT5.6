@@ -4,6 +4,7 @@
 #include "SkelotSpatialGrid.h"
 #include "SkelotObstacle.h"
 #include "SkelotWorld.h"
+#include "Async/ParallelFor.h"
 
 FSkelotPBDCollisionSystem::FSkelotPBDCollisionSystem()
 	: Config(FSkelotPBDConfig::GetRecommendedConfig())
@@ -159,68 +160,73 @@ void FSkelotPBDCollisionSystem::SolveCollisions(FSkelotInstancesSOA& SOA, int32 
 void FSkelotPBDCollisionSystem::SolveIteration(FSkelotInstancesSOA& SOA, int32 NumInstances,
 											   const FSkelotSpatialGrid& SpatialGrid)
 {
-	// 遍历所有有效实例
-	for (int32 InstanceIndex = 0; InstanceIndex < NumInstances; InstanceIndex++)
+	TArray<int32> PerInstancePairCounts;
+	TArray<float> PerInstanceCorrectionSums;
+	PerInstancePairCounts.SetNumZeroed(NumInstances);
+	PerInstanceCorrectionSums.SetNumZeroed(NumInstances);
+
+	ParallelFor(NumInstances, [&](int32 InstanceIndex)
 	{
 		// 跳过已销毁的实例
 		if (SOA.Slots[InstanceIndex].bDestroyed)
 		{
-			continue;
+			return;
 		}
 
 		// 获取当前位置
 		const FVector3d& MyPos = SOA.Locations[InstanceIndex];
+		FVector3f AccumulatedCorrection = FVector3f::ZeroVector;
+		int32 LocalPairCount = 0;
+		float LocalCorrectionSum = 0.0f;
 
-		// 使用空间网格查询邻居
-		NeighborIndices.Reset();
-		SpatialGrid.QuerySphere(FVector(MyPos), Config.CollisionRadius * 2.0f, NeighborIndices);
+		// 使用空间网格查询邻居（线程局部缓存）
+		TArray<int32> LocalNeighborIndices;
+		LocalNeighborIndices.Reset();
+		SpatialGrid.QuerySphere(FVector(MyPos), Config.CollisionRadius * 2.0f, LocalNeighborIndices);
 
 		// 限制邻居数量
-		int32 NumNeighbors = FMath::Min(NeighborIndices.Num(), Config.MaxNeighbors);
+		int32 NumNeighbors = FMath::Min(LocalNeighborIndices.Num(), Config.MaxNeighbors);
 
-		// 处理每个邻居
+		// 处理每个邻居，仅累计“自身”校正，避免跨线程写冲突
 		for (int32 i = 0; i < NumNeighbors; i++)
 		{
-			int32 NeighborIndex = NeighborIndices[i];
+			int32 NeighborIndex = LocalNeighborIndices[i];
 
-			// 跳过自己
-			if (NeighborIndex == InstanceIndex)
+			if (NeighborIndex == InstanceIndex || SOA.Slots[NeighborIndex].bDestroyed)
 			{
 				continue;
 			}
 
-			// 跳过已销毁的实例
-			if (SOA.Slots[NeighborIndex].bDestroyed)
-			{
-				continue;
-			}
-
-			// 检查碰撞过滤
 			if (!ShouldCollide(SOA, InstanceIndex, NeighborIndex))
 			{
 				continue;
 			}
 
-			// 避免重复处理（只处理索引小的）
-			if (NeighborIndex < InstanceIndex)
+			FVector3f CorrectionSelf, CorrectionNeighbor;
+			if (SolveCollisionPair(SOA, InstanceIndex, NeighborIndex, CorrectionSelf, CorrectionNeighbor))
 			{
-				continue;
-			}
-
-			// 求解碰撞对
-			FVector3f CorrectionA, CorrectionB;
-			if (SolveCollisionPair(SOA, InstanceIndex, NeighborIndex, CorrectionA, CorrectionB))
-			{
-				// 累加位置校正量
-				PositionCorrections[InstanceIndex] += CorrectionA;
-				PositionCorrections[NeighborIndex] += CorrectionB;
-
-				// 更新统计
-				ProcessedCollisionPairs++;
-				TotalCorrection += (CorrectionA.Length() + CorrectionB.Length());
+				AccumulatedCorrection += CorrectionSelf;
+				LocalPairCount++;
+				LocalCorrectionSum += CorrectionSelf.Length();
 			}
 		}
+
+		PositionCorrections[InstanceIndex] = AccumulatedCorrection;
+		PerInstancePairCounts[InstanceIndex] = LocalPairCount;
+		PerInstanceCorrectionSums[InstanceIndex] = LocalCorrectionSum;
+	});
+
+	// 汇总统计
+	int32 TotalPairs = 0;
+	float TotalCorr = 0.0f;
+	for (int32 i = 0; i < NumInstances; ++i)
+	{
+		TotalPairs += PerInstancePairCounts[i];
+		TotalCorr += PerInstanceCorrectionSums[i];
 	}
+	// 每个碰撞对会被A和B各计算一次，统计时折半近似为唯一碰撞对数量
+	ProcessedCollisionPairs += TotalPairs / 2;
+	TotalCorrection += TotalCorr;
 
 	// 应用位置校正
 	for (int32 i = 0; i < NumInstances; i++)
