@@ -3,7 +3,7 @@
 **Skelot** 是一款专为 Unreal Engine 5.6 设计的高性能实例化骨骼网格渲染插件。通过 GPU 驱动的动画系统，实现大规模骨骼网格角色的高效渲染。
 
 [![Unreal Engine](https://img.shields.io/badge/Unreal%20Engine-5.6-purple)](https://www.unrealengine.com/)
-[![Platform](https://img.shields.io/badge/Platform-Win64%20%7C%20Linux%20%7C%20Mac%20%7C%20Android%20%7C%20iOS-blue)]()
+[![Platform](https://img.shields.io/badge/Platform-Win64%20%7C%20Linux%20%7C%20Mac%20%7C%20Android%20%7C%20iOS-blue)](https://www.unrealengine.com/)
 
 ---
 
@@ -180,8 +180,8 @@ Skelot/
 ├── Config/
 │   └── BaseSkelot.ini         # 默认配置
 ├── Skelot.uplugin
-├── CLAUDE.md                   # Claude Code 开发指南
-└── TECHNICAL_REFERENCE.md      # 技术参考文档
+├── ../CLAUDE.md                # Claude Code 开发指南（仓库根目录）
+└── docs/TECHNICAL_REFERENCE.md # 技术参考文档
 ```
 
 ---
@@ -198,7 +198,7 @@ Skelot/
 
 ## ⚙️ 配置选项
 
-编辑 `Config/DefaultSkelot.ini`:
+编辑 `Config/BaseSkelot.ini`:
 
 ```ini
 [/Script/Skelot.SkelotDeveloperSettings]
@@ -232,7 +232,7 @@ Skelot.DebugClusters 1
 ## 📚 文档
 
 - [技术参考文档](TECHNICAL_REFERENCE.md) - 详细的架构说明和 API 参考
-- [CLAUDE.md](CLAUDE.md) - Claude Code 开发指南
+- [CLAUDE.md](../CLAUDE.md) - Claude Code 开发指南
 
 ---
 

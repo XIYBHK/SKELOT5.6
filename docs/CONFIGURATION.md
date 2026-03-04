@@ -5,6 +5,8 @@
 
 本文档详细说明 Skelot 插件的 PBD 碰撞系统和 RVO 避障系统的配置参数。
 
+> 命名约定：本文中的参数名使用配置结构体字段名（如 `CollisionRadius`、`TimeHorizon`）。若在蓝图中查看，节点显示名可能是中文或空格分隔名称，以节点 `DisplayName` 为准。
+
 ---
 
 ## 目录

@@ -437,6 +437,7 @@ USkeletalMeshComponent* UntieDynamicPoseFromComponent(int32 InstanceIndex, int32
 ### USkelotWorldSubsystem - 蓝图接口
 
 所有函数都有 `WorldContext` 参数，可在蓝图中直接调用。
+说明：为兼容历史版本，C++ 标识符同时存在 `Skelot_XXX` 与 `SkelotXXX` 两种风格；蓝图中以节点显示名为准。
 
 ```cpp
 // 实例
@@ -536,7 +537,7 @@ float3x4 CalcBoneMatrix(FVertexFactoryInput Input, uint AnimationFrameIndex)
 2. 在项目设置中指定类路径：
 
 ```cpp
-// DefaultSkelot.ini
+// BaseSkelot.ini
 [/Script/Skelot.SkelotDeveloperSettings]
 SkelotWorldClass=/Script/YourModule.YourSkelotWorld
 ```
@@ -563,7 +564,7 @@ SkelotWorldClass=/Script/YourModule.YourSkelotWorld
 
 ## 配置文件
 
-### DefaultSkelot.ini
+### BaseSkelot.ini
 
 ```ini
 [/Script/Skelot.SkelotDeveloperSettings]
@@ -583,8 +584,8 @@ SkelotWorldClass=
 # 绘制实例边界
 Skelot.DrawInstanceBounds 1
 
-# 显示调试信息
-Skelot.DebugShowInfo 1
+# 打印统计信息
+Skelot.Stats
 ```
 
 ---

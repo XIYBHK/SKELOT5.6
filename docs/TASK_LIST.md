@@ -47,9 +47,9 @@
 ### 1.5.1 动画播放参数
 | 任务 | 优先级 | 状态 | 说明 |
 |------|--------|------|------|
-| 定义 FSkelotAnimPlayParamsEx | P0 | ✅ | Animation, bLoop, PlayRate, StartPosition, BlendInTime |
+| 定义 FSkelotAnimPlayParams | P0 | ✅ | Animation, bLoop, PlayScale, StartAt, TransitionDuration |
 | 扩展 InstancePlayAnimation | P0 | ✅ | 支持新的参数结构体 |
-| 实现 BlendInTime 混合 | P1 | ✅ | 动画过渡混合时间支持 |
+| 实现 TransitionDuration 过渡 | P1 | ✅ | 动画过渡时长支持 |
 
 ### 1.5.2 动画蓝图 API
 | 任务 | 优先级 | 状态 | 说明 |
@@ -278,20 +278,6 @@
 - 设置默认渲染参数
 - 保存资产
 
-让我更新 TASK列表文件。更新进度统计。然后更新更新日志。最后创建 git commit。让我先更新 TASK列表。更新 Phase 8 的完成状态。然后更新进度统计。最后提交代码。提交前检查：
-
-```bash
-git add -A
-git commit -m "feat(Ed): 实现编辑器扩展 - 右键菜单资产创建功能
-
-- 创建 FSkelotAssetTypeActions_SkeletalMesh 类，继承 FAssetTypeActions_Base
-- 实现右键菜单扩展逻辑
-- 注册/注销资产类型操作
-
-- 更新 TASK列表文件
-- 编译测试通过
-- 提交 git"
-
 ### 8.2 调试工具
 | 任务 | 优先级 | 状态 | 说明 |
 |------|--------|------|------|
@@ -404,4 +390,4 @@ git commit -m "feat(Ed): 实现编辑器扩展 - 右键菜单资产创建功能
 
 ---
 
-*最后更新: 2026-03-03*
+*最后更新: 2026-03-04*

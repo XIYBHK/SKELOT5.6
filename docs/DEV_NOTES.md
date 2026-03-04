@@ -289,6 +289,8 @@ void RebuildIncremental(...)
 
 ## 调试工具系统实现 (2026-03-02)
 
+> 命名约定：本文涉及“蓝图节点名 / C++ 函数名 / 控制台命令名”三套命名，示例代码以实际 C++ 标识符为准；对外说明建议同时标注蓝图显示名。
+
 ### 创建文件
 
 - `Source/Skelot/Public/SkelotDebugTools.h` - 调试工具头文件

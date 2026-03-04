@@ -40,9 +40,9 @@
 - Params: 动画播放参数
   - Animation: 动画序列
   - bLoop: 是否循环
-  - PlayRate: 播放速率 (1.0为正常速度)
-  - StartPosition: 起始位置 (秒)
-  - BlendInTime: 混合时间 (秒)
+  - PlayScale: 播放速率 (1.0为正常速度)
+  - StartAt: 起始时间 (秒)
+  - TransitionDuration: 过渡时长 (秒)
 
 返回值:
 - 动画长度 (秒)，失败返回-1
@@ -60,17 +60,17 @@
 **现状:** 任务列表完全遗漏动画系统扩展
 
 **影响:** 原版 Skelot 有 `InstancePlayAnimation`，但缺少:
-- 结构化的播放参数 `FSkelotAnimPlayParamsEx`
-- 混合时间 (BlendInTime) 支持
+- 结构化的播放参数 `FSkelotAnimPlayParams`
+- 过渡时长 (TransitionDuration) 支持
 - 蓝图友好的封装 API
 
 **需添加任务:**
 
 | 任务 | 优先级 | 说明 |
 |------|--------|------|
-| 定义 FSkelotAnimPlayParamsEx 结构体 | P0 | 包含 Animation, bLoop, PlayRate, StartPosition, BlendInTime |
+| 定义 FSkelotAnimPlayParams 结构体 | P0 | 包含 Animation, bLoop, PlayScale, StartAt, TransitionDuration |
 | 扩展 InstancePlayAnimation | P0 | 支持新的参数结构体 |
-| 实现 BlendInTime 混合 | P1 | 平滑过渡到新动画 |
+| 实现 TransitionDuration 过渡 | P1 | 平滑过渡到新动画 |
 | Skelot_PlayAnimation 蓝图API | P0 | USkelotWorldSubsystem 封装 |
 | Skelot_GetAnimCollection 蓝图API | P1 | 获取实例的动画集 |
 
@@ -185,11 +185,11 @@
 
 ### 6. 蓝图 API 命名规范
 
-参考文档使用以下命名规范:
-- `Skelot_CreateInstance` (下划线分隔)
-- `Skelot Set Instance Velocity` (空格分隔 - 蓝图搜索友好)
+当前项目存在两层命名：
+- **C++ 函数名**：历史兼容，混合 `Skelot_CreateInstance` 与 `SkelotGetTransform` 风格
+- **蓝图节点名**：以 `DisplayName` 为准（空格分隔，便于搜索）
 
-**建议:** 统一使用 `Skelot_` 前缀 + 空格分隔，便于蓝图搜索
+**建议:** 文档统一采用“双名称标注”规则：标题写蓝图节点名，必要时在说明中补充对应 C++ 函数名。
 
 ---
 
@@ -199,8 +199,8 @@
 
 | 任务 | 优先级 | 状态 | 说明 |
 |------|--------|------|------|
-| 定义 FSkelotAnimPlayParamsEx | P0 | ⬜ | 扩展动画播放参数 |
-| 实现 BlendInTime 混合 | P1 | ⬜ | 动画过渡混合 |
+| 定义 FSkelotAnimPlayParams | P0 | ⬜ | 扩展动画播放参数 |
+| 实现 TransitionDuration 过渡 | P1 | ⬜ | 动画过渡混合 |
 | Skelot_PlayAnimation API | P0 | ⬜ | 蓝图封装 |
 | Skelot_GetAnimCollection API | P1 | ⬜ | 蓝图封装 |
 
@@ -235,7 +235,7 @@
 
 | 内容 | 状态 | 说明 |
 |------|------|------|
-| 动画混合算法 | ❌ 缺失 | BlendInTime 实现方案 |
+| 动画混合算法 | ❌ 缺失 | TransitionDuration 实现方案 |
 | 层级变换传播 | ❌ 缺失 | 父子关系变换更新 |
 | Mesh 表面采样 | ⚠️ 简略 | 需详细算法说明 |
 | 掩码过滤优化 | ❌ 缺失 | 空间查询中的掩码处理 |

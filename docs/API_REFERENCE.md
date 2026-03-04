@@ -5,6 +5,8 @@
 
 本文档描述 Skelot 插件的所有蓝图 API。在蓝图中搜索 `Skelot` 或直接使用下面的函数名即可找到。
 
+> 命名约定：本页标题使用蓝图显示名（如 `Skelot Get Transform`）；对应的 C++ `USkelotWorldSubsystem` 函数名可能是 `SkelotGetTransform`、`Skelot_CreateInstance` 等历史兼容命名。
+
 ---
 
 ## 目录
@@ -32,7 +34,7 @@
 | 参数 | 类型 | 说明 |
 |------|------|------|
 | Transform | FTransform | 实例的世界变换（位置、旋转、缩放） |
-| RenderParams | USkelotInstanceRenderDesc* | 渲染参数资产，定义外观和动画集 |
+| RenderParams | USkelotRenderParams* | 渲染参数资产，定义外观和动画集 |
 | UserObject | UObject* | 可选的用户自定义对象 |
 
 **返回值**
@@ -50,7 +52,7 @@
 | 参数 | 类型 | 说明 |
 |------|------|------|
 | Transforms | TArray\<FTransform\> | 变换数组 |
-| RenderParams | USkelotInstanceRenderDesc* | 所有实例共用的渲染参数 |
+| RenderParams | USkelotRenderParams* | 所有实例共用的渲染参数 |
 
 **返回值**
 | 类型 | 说明 |
@@ -153,16 +155,16 @@
 | 参数 | 类型 | 说明 |
 |------|------|------|
 | Handle | FSkelotInstanceHandle | 实例句柄 |
-| Params | FSkelotAnimPlayParamsEx | 动画播放参数 |
+| Params | FSkelotAnimPlayParams | 动画播放参数 |
 
-**FSkelotAnimPlayParamsEx 结构**
+**FSkelotAnimPlayParams 结构**
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| Animation | UAnimSequence* | 动画序列 |
+| Animation | UAnimSequenceBase* | 动画序列 |
 | bLoop | bool | 是否循环 |
 | PlayScale | float | 播放速率（1.0为正常速度） |
-| StartPosition | float | 起始位置（秒） |
-| BlendInTime | float | 混合时间（秒） |
+| StartAt | float | 起始时间（秒） |
+| TransitionDuration | float | 过渡时长（秒） |
 
 **返回值**
 | 类型 | 说明 |
