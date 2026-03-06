@@ -384,9 +384,20 @@ public:
 	//Walks up the attachment chain and returns the instance index at the top. returns -1 if no parent.
 	int32 GetInstanceRootIndex(int32 InstanceIndex) const
 	{
+		if (!IsInstanceAlive(InstanceIndex))
+			return -1;
+
 		int32 Top = GetInstanceParentIndex(InstanceIndex);
-		for (; Top != -1 && GetInstanceParentIndex(Top) != -1; Top = GetInstanceParentIndex(Top));
-		return Top;
+		int32 RemainingHops = SOA.Slots.Num();
+		while (Top != -1 && RemainingHops-- > 0)
+		{
+			const int32 ParentIdx = GetInstanceParentIndex(Top);
+			if (ParentIdx == -1)
+				return Top;
+
+			Top = ParentIdx;
+		}
+		return -1;
 	}
 
 

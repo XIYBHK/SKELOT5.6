@@ -1779,6 +1779,9 @@ float ASkelotWorld::InstancePlayAnimation(int32 InstanceIndex, const FSkelotAnim
 
 void ASkelotWorld::ResetAnimationState(int32 InstanceIndex)
 {
+	if (!IsInstanceAlive(InstanceIndex))
+		return;
+
 	this->EnableInstanceDynamicPose(InstanceIndex, false);
 
 	FSkelotInstancesSOA::FAnimData& AnimData = SOA.AnimDatas[InstanceIndex];
@@ -1795,31 +1798,40 @@ void ASkelotWorld::ResetAnimationState(int32 InstanceIndex)
 
 float ASkelotWorld::GetInstancePlayLength(int32 InstanceIndex) const
 {
+	if (!IsInstanceAlive(InstanceIndex))
+		return 0.0f;
+
 	if (UAnimSequenceBase* AS = SOA.AnimDatas[InstanceIndex].CurrentAsset)
 		return AS->GetPlayLength();
 
-	return 0;
+	return 0.0f;
 }
 
 float ASkelotWorld::GetInstancePlayTimeRemaining(int32 InstanceIndex) const
 {
+	if (!IsInstanceAlive(InstanceIndex))
+		return 0.0f;
+
 	if (UAnimSequenceBase* AS = SOA.AnimDatas[InstanceIndex].CurrentAsset)
 	{
 		float Remain = AS->GetPlayLength() - SOA.AnimDatas[InstanceIndex].AnimationTime;
 		check(Remain >= 0 && Remain <= AS->GetPlayLength());
 		return Remain;
 	}
-	return 0;
+	return 0.0f;
 }
 
 float ASkelotWorld::GetInstancePlayTimeFraction(int32 InstanceIndex) const
 {
+	if (!IsInstanceAlive(InstanceIndex))
+		return 0.0f;
+
 	if (UAnimSequenceBase* AS = SOA.AnimDatas[InstanceIndex].CurrentAsset)
 	{
 		float Fraction = SOA.AnimDatas[InstanceIndex].AnimationTime / AS->GetPlayLength();
 		return FMath::Clamp(Fraction, 0.0f, 1.0f);
 	}
-	return 0;
+	return 0.0f;
 }
 
 USkelotAnimCollection* ASkelotWorld::GetInstanceAnimCollection(FSkelotInstanceHandle H) const
@@ -1834,7 +1846,7 @@ USkelotAnimCollection* ASkelotWorld::GetInstanceAnimCollection(FSkelotInstanceHa
 
 USkelotAnimCollection* ASkelotWorld::GetInstanceAnimCollection(int32 InstanceIndex) const
 {
-	return Impl()->GetInstanceDesc(InstanceIndex).AnimCollection;
+	return IsInstanceAlive(InstanceIndex) ? Impl()->GetInstanceDesc(InstanceIndex).AnimCollection : nullptr;
 }
 
 FSkelotAttachParentData& ASkelotWorld::GetOrCreateInstanceAttachParentData(int32 InstanceIndex)
@@ -1850,9 +1862,11 @@ FSkelotAttachParentData& ASkelotWorld::GetOrCreateInstanceAttachParentData(int32
 
 FSkelotAttachParentData* ASkelotWorld::GetInstanceAttachParentData(int32 InstanceIndex) const
 {
-	check(InstanceIndex != -1);
-	int32 AttchIdx = SOA.MiscData[InstanceIndex].AttachmentIndex;
-	return AttchIdx != -1 ? const_cast<FSkelotAttachParentData*>(&AttachParentArray[AttchIdx]) : nullptr;
+	if (!IsInstanceAlive(InstanceIndex))
+		return nullptr;
+
+	const int32 AttchIdx = SOA.MiscData[InstanceIndex].AttachmentIndex;
+	return AttachParentArray.IsValidIndex(AttchIdx) ? const_cast<FSkelotAttachParentData*>(&AttachParentArray[AttchIdx]) : nullptr;
 }
 
 bool ASkelotWorld::InstanceAttachChild(FSkelotInstanceHandle Parent, FSkelotInstanceHandle Child, FName SocketOrBoneName, const FTransform& ReletiveTransform, bool bKeepWorldTransform)
@@ -1974,14 +1988,22 @@ void ASkelotWorld::SetInstanceRelativeTransform(int32 InstanceIndex, const FTran
 
 int32 ASkelotWorld::GetInstanceParentIndex(int32 InstanceIndex) const
 {
+	if (!IsInstanceAlive(InstanceIndex))
+		return -1;
+
 	const FSkelotAttachParentData* Frag = GetInstanceAttachParentData(InstanceIndex);
-	return Frag ? Frag->Parent : -1;
+	const int32 ParentIdx = Frag ? Frag->Parent : -1;
+	return IsInstanceAlive(ParentIdx) ? ParentIdx : -1;
 }
 
 bool ASkelotWorld::IsInstanceChildOf(int32 InstanceIndex, int32 TargetParentIndex) const
 {
+	if (!IsInstanceAlive(InstanceIndex) || !IsInstanceAlive(TargetParentIndex))
+		return false;
+
 	int32 ParentIdx = GetInstanceParentIndex(InstanceIndex);
-	while (ParentIdx != -1)
+	int32 RemainingHops = SOA.Slots.Num();
+	while (ParentIdx != -1 && RemainingHops-- > 0)
 	{
 		if(ParentIdx == TargetParentIndex)
 			return true;
@@ -1996,11 +2018,20 @@ bool ASkelotWorld::IsInstanceChildOf(int32 InstanceIndex, int32 TargetParentInde
 
 void ASkelotWorld::ForEachChild(FSkelotAttachParentData& Root, ChildVisitFunc Func)
 {
+	if (!IsInstanceAlive(Root.InstanceIndex))
+		return;
+
 	int32 ChildIdx = Root.FirstChild;
-	while (ChildIdx != -1)
+	int32 RemainingChildren = SOA.Slots.Num();
+	while (ChildIdx != -1 && RemainingChildren-- > 0)
 	{
+		if (!IsInstanceAlive(ChildIdx))
+			break;
+
 		FSkelotAttachParentData* ChildFrag = GetInstanceAttachParentData(ChildIdx);
-		checkf(ChildFrag, TEXT("when parent is pointing to the child. child MUST have FSkelotAttachParentData."));
+		if (!ChildFrag || ChildFrag->InstanceIndex != ChildIdx)
+			break;
+
 		Func(Root, *ChildFrag);
 		ForEachChild(*ChildFrag, Func);
 		ChildIdx = ChildFrag->Down;
@@ -2009,18 +2040,31 @@ void ASkelotWorld::ForEachChild(FSkelotAttachParentData& Root, ChildVisitFunc Fu
 
 void ASkelotWorld::ForEachChild(int32 InstanceIndex, ChildVisitFunc Func)
 {
+	if (!IsInstanceAlive(InstanceIndex))
+		return;
+
 	if(FSkelotAttachParentData* Frag = GetInstanceAttachParentData(InstanceIndex))
 		ForEachChild(*Frag, Func);
 }
 
 void ASkelotWorld::ForEachOffspring(int32 InstanceIndex, ChildVisitFunc Func)
 {
+	if (!IsInstanceAlive(InstanceIndex))
+		return;
+
 	if (FSkelotAttachParentData* Frag = GetInstanceAttachParentData(InstanceIndex))
 	{
 		int32 ChildIdx = Frag->FirstChild;
-		while (ChildIdx != -1)
+		int32 RemainingChildren = SOA.Slots.Num();
+		while (ChildIdx != -1 && RemainingChildren-- > 0)
 		{
+			if (!IsInstanceAlive(ChildIdx))
+				break;
+
 			FSkelotAttachParentData* ChildFrag = GetInstanceAttachParentData(ChildIdx);
+			if (!ChildFrag || ChildFrag->InstanceIndex != ChildIdx)
+				break;
+
 			Func(*Frag, *ChildFrag);
 			ChildIdx = ChildFrag->Down;
 		}
@@ -2049,6 +2093,9 @@ void ASkelotWorld::UpdateChildTransforms(FSkelotAttachParentData& RootFrag)
 }
 FTransform3f ASkelotWorld::GetInstanceBoneTransformCS(int32 InstanceIndex, int32 BoneIndex) const
 {
+	if (!IsInstanceAlive(InstanceIndex))
+		return FTransform3f::Identity;
+
 	const USkelotAnimCollection* AnimCollection = GetInstanceDesc(InstanceIndex).AnimCollection;
 	if (AnimCollection && AnimCollection->IsBoneTransformCached(BoneIndex))
 	{
@@ -2066,6 +2113,9 @@ FTransform ASkelotWorld::GetInstanceBoneTransformWS(int32 InstanceIndex, int32 S
 
 FTransform ASkelotWorld::GetInstanceSocketTransform(int32 InstanceIndex, FName SocketOrBoneName, USkeletalMesh* InMesh /*= nullptr*/, bool bWorldSpace /*= true*/) const
 {
+	if (!IsInstanceAlive(InstanceIndex))
+		return FTransform::Identity;
+
 	FTransform SocketT = FTransform::Identity;
 
 	if (!SocketOrBoneName.IsNone())
@@ -2081,7 +2131,8 @@ FTransform ASkelotWorld::GetInstanceSocketTransform(int32 InstanceIndex, FName S
 			}
 			else
 			{
-				SocketT = SocketPtr->GetSocketLocalTransform() * ((FTransform)GetInstanceBoneTransformCS(InstanceIndex, BoneIndex));
+				const FTransform SocketLocalTransform = SocketPtr ? SocketPtr->GetSocketLocalTransform() : FTransform::Identity;
+				SocketT = SocketLocalTransform * ((FTransform)GetInstanceBoneTransformCS(InstanceIndex, BoneIndex));
 			}
 		}
 	}
@@ -2096,7 +2147,7 @@ USkeletalMeshSocket* ASkelotWorld::FindSkeletalSocket(const FSkelotInstanceRende
 	if (InMesh) //#TODO check if skeletons are identical ?
 		return InMesh->FindSocket(SocketName);
 
-	if (Desc.Meshes.Num() == 0 && Desc.Meshes[0].Mesh)
+	if (Desc.Meshes.Num() > 0 && Desc.Meshes[0].Mesh)
 	{
 		return Desc.Meshes[0].Mesh->FindSocket(SocketName);
 	}
@@ -2109,6 +2160,9 @@ USkeletalMeshSocket* ASkelotWorld::FindSkeletalSocket(const FSkelotInstanceRende
 
 void ASkelotWorld::SetInstanceCustomDataFloat(int32 InstanceIndex, const float* Floats, int32 Offset, int32 Count)
 {
+	if (!IsInstanceAlive(InstanceIndex) || Floats == nullptr || Count <= 0)
+		return;
+
 	float* InstanceFloats = GetInstanceCustomDataFloats(InstanceIndex);
 	check(Offset >= 0);
 	for (int32 Idx = 0; Idx < Count; Idx++)
@@ -2121,6 +2175,9 @@ void ASkelotWorld::SetInstanceCustomDataFloat(int32 InstanceIndex, const float* 
 
 void ASkelotWorld::DestroyChildren(int32 InstanceIndex)
 {
+	if (!IsInstanceAlive(InstanceIndex))
+		return;
+
 	TArray<FSkelotInstanceHandle, TInlineAllocator<16>> Childs;
 	GetInstanceChildren<true>(InstanceIndex, Childs);
 	for (FSkelotInstanceHandle H : Childs)
@@ -2631,12 +2688,15 @@ void ASkelotWorld::GetAllHandles(TArray<FSkelotInstanceHandle>& OutHandles)
 
 TObjectPtr<UObject> ASkelotWorld::GetInstanceUserObject(int32 InstanceIndex)
 {
-	return SOA.UserObjects.Num() != 0 ? SOA.UserObjects[InstanceIndex] : nullptr;
+	return IsInstanceAlive(InstanceIndex) && SOA.UserObjects.IsValidIndex(InstanceIndex) ? SOA.UserObjects[InstanceIndex] : nullptr;
 }
 
 void ASkelotWorld::SetInstanceUserObject(int32 InstanceIndex, TObjectPtr<UObject> InObject)
 {
-	if (SOA.UserObjects.Num() == 0)
+	if (!IsInstanceAlive(InstanceIndex))
+		return;
+
+	if (SOA.UserObjects.Num() < SOA.Slots.Num())
 	{
 		SOA.UserObjects.SetNumZeroed(SOA.Slots.Num());
 	}
@@ -2646,6 +2706,9 @@ void ASkelotWorld::SetInstanceUserObject(int32 InstanceIndex, TObjectPtr<UObject
 
 bool ASkelotWorld::EnableInstanceDynamicPose(int32 InstanceIndex, bool bEnable)
 {
+	if (!IsInstanceAlive(InstanceIndex))
+		return false;
+
 	const bool bIsDynamic = SOA.Slots[InstanceIndex].bDynamicPose;
 	if (bIsDynamic == bEnable)
 		return true;
@@ -2685,7 +2748,7 @@ bool ASkelotWorld::EnableInstanceDynamicPose(int32 InstanceIndex, bool bEnable)
 
 bool ASkelotWorld::TieDynamicPoseToComponent(int32 InstanceIndex, USkeletalMeshComponent* SrcComponent, int32 UserData, bool bCopyTransform)
 {
-	if(SOA.Slots[InstanceIndex].bDynamicPose && ::IsValid(SrcComponent))
+	if(IsInstanceAlive(InstanceIndex) && SOA.Slots[InstanceIndex].bDynamicPose && ::IsValid(SrcComponent))
 	{
 		FSkelotFrag_DynPoseTie& Frag = DynamicPosTiedMap.FindOrAdd(InstanceIndex, FSkelotFrag_DynPoseTie());
 		Frag.SKMeshComponent = SrcComponent;
@@ -2698,6 +2761,9 @@ bool ASkelotWorld::TieDynamicPoseToComponent(int32 InstanceIndex, USkeletalMeshC
 
 USkeletalMeshComponent* ASkelotWorld::UntieDynamicPoseFromComponent(int32 InstanceIndex, int32* OutUserData)
 {
+	if (!IsValidInstanceIndex(InstanceIndex) && !DynamicPosTiedMap.Contains(InstanceIndex))
+		return nullptr;
+
 	FSkelotFrag_DynPoseTie RemovedData;
 	if (DynamicPosTiedMap.RemoveAndCopyValue(InstanceIndex, RemovedData))
 	{
@@ -2711,7 +2777,7 @@ USkeletalMeshComponent* ASkelotWorld::UntieDynamicPoseFromComponent(int32 Instan
 
 FSkelotFrag_DynPoseTie* ASkelotWorld::GetDynamicPoseTieData(int32 InstanceIndex)
 {
-	return DynamicPosTiedMap.Find(InstanceIndex);
+	return IsValidInstanceIndex(InstanceIndex) ? DynamicPosTiedMap.Find(InstanceIndex) : nullptr;
 }
 
 
@@ -2720,6 +2786,9 @@ FSkelotFrag_DynPoseTie* ASkelotWorld::GetDynamicPoseTieData(int32 InstanceIndex)
 void ASkelotWorld::LineTraceInstance(int32 InstanceIndex, const FLineTraceParams& Params, FLineTraceResult& OutResult) const
 {
 	OutResult.BoneIndex = -1;	//bone index of closest hit
+
+	if (!IsInstanceAlive(InstanceIndex))
+		return;
 
 	const FSkelotInstanceRenderDesc& RenderDesc = GetInstanceDesc(InstanceIndex);
 	USkelotAnimCollection* AnimCollection = RenderDesc.AnimCollection;
@@ -2730,7 +2799,8 @@ void ASkelotWorld::LineTraceInstance(int32 InstanceIndex, const FLineTraceParams
 	check(InstanceTransform.IsValid());
 	Chaos::FVec3 Dir = Params.End - Params.Start;
 	const auto Len = Dir.Size();
-	checkf(Len > UE_KINDA_SMALL_NUMBER, TEXT("ray length should be greater that zero"));
+	if (Len <= UE_KINDA_SMALL_NUMBER)
+		return;
 	Dir /= Len;
 
 	
@@ -2846,6 +2916,9 @@ FSkelotInstanceHandle ASkelotWorld::LineTraceInstances(TConstArrayView<int32> In
 void ASkelotWorld::DebugDrawCompactPhysicsAsset(int32 InstanceIndex, FColor Color)
 {
 #if UE_ENABLE_DEBUG_DRAWING
+	if (!IsInstanceAlive(InstanceIndex))
+		return;
+
 	const FSkelotInstanceRenderDesc& RenderDesc = GetInstanceDesc(InstanceIndex);
 	USkelotAnimCollection* AnimCollection = RenderDesc.AnimCollection;
 	if (!AnimCollection)
@@ -3010,6 +3083,9 @@ void ASkelotWorld::TickTimers()
 
 FRenderBounds ASkelotWorld::CalcLocalBound(int32 InstanceIndex) const
 {
+	if (!IsInstanceAlive(InstanceIndex))
+		return FRenderBounds(FVector3f::ZeroVector, FVector3f::ZeroVector);
+
 	const FSkelotInstanceRenderDesc& Desc = GetInstanceDesc(InstanceIndex);
 	FBoxMinMaxFloat InstanceLocalBound(ForceInit);
 
@@ -3033,6 +3109,9 @@ FRenderBounds ASkelotWorld::CalcLocalBound(int32 InstanceIndex) const
 
 FRenderBounds ASkelotWorld::CalcInstanceBoundWS(int32 InstanceIndex)
 {
+	if (!IsInstanceAlive(InstanceIndex))
+		return FRenderBounds(FVector3f::ZeroVector, FVector3f::ZeroVector);
+
 	FRenderBounds LocalBound = this->CalcLocalBound(InstanceIndex);
 	return LocalBound.TransformBy(GetInstanceTransform(InstanceIndex).ToMatrixWithScale());
 }
