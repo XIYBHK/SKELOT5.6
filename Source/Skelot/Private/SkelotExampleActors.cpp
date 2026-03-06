@@ -323,7 +323,18 @@ void ASkelotExampleCollisionAvoidance::InitializeInstances()
 		return;
 	}
 
-	// 清除现有实例
+	// 清除现有实例，避免重复初始化后遗留旧实例
+	if (InstanceDataArray.Num() > 0)
+	{
+		TArray<FSkelotInstanceHandle> HandlesToDestroy;
+		HandlesToDestroy.Reserve(InstanceDataArray.Num());
+		for (const FInstanceData& Data : InstanceDataArray)
+		{
+			HandlesToDestroy.Add(Data.Handle);
+		}
+		USkelotWorldSubsystem::Skelot_DestroyInstances(this, HandlesToDestroy);
+	}
+
 	InstanceDataArray.Empty();
 
 	// 生成随机位置
@@ -526,17 +537,28 @@ void ASkelotExampleCollisionAvoidance::UpdateInstanceMovement(float DeltaTime)
 			{
 				// 计算移动方向和速度
 				FVector Direction = ToTarget.GetSafeNormal();
-				FVector3f Velocity = FVector3f(Direction * MoveSpeed);
+				const FVector3f DesiredVelocity = FVector3f(Direction * MoveSpeed);
+				const FVector3f CurrentVelocity = SkelotWorld->GetInstanceVelocity(Data.Handle);
 
-				SkelotWorld->SetInstanceVelocity(Data.Handle.InstanceIndex, Velocity);
+				SkelotWorld->SetInstanceVelocity(Data.Handle.InstanceIndex, DesiredVelocity);
 
-				// 更新位置（由 PBD/RVO 系统处理碰撞后的实际移动）
-				// 这里我们手动更新位置用于演示
-				FVector NewLoc = CurrentLoc + Direction * MoveSpeed * DeltaTime;
+				// 未启用避障时按目标速度前进；启用后使用上一帧已调整的速度，避免覆盖避障结果
+				FVector AppliedVelocity = FVector(DesiredVelocity);
+				if (bEnablePBD || bEnableRVO)
+				{
+					AppliedVelocity = FVector(CurrentVelocity);
+					if (AppliedVelocity.IsNearlyZero())
+					{
+						AppliedVelocity = FVector(DesiredVelocity);
+					}
+				}
+
+				FVector NewLoc = CurrentLoc + AppliedVelocity * DeltaTime;
 				SkelotWorld->SetInstanceLocation(Data.Handle.InstanceIndex, NewLoc);
 
 				// 朝向目标
-				FQuat TargetRotation = FRotationMatrix::MakeFromX(Direction).Rotator().Quaternion();
+				const FVector FacingDirection = AppliedVelocity.IsNearlyZero() ? Direction : AppliedVelocity.GetSafeNormal();
+				FQuat TargetRotation = FRotationMatrix::MakeFromX(FacingDirection).Rotator().Quaternion();
 				SkelotWorld->SetInstanceRotation(Data.Handle.InstanceIndex, FQuat4f(TargetRotation));
 
 				// 播放行走动画

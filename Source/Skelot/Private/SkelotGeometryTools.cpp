@@ -1091,27 +1091,6 @@ void USkelotGeometryTools::GetPixelsByTexture(UTexture2D* Texture, int32 SampleS
 
 	Mip.BulkData.Unlock();
 #else
-	// 运行时版本 - 需要使用渲染资源
-	const int32 NumSamplesX = FMath::CeilToInt(static_cast<float>(TextureWidth) / SampleStep);
-	const int32 NumSamplesY = FMath::CeilToInt(static_cast<float>(TextureHeight) / SampleStep);
-	const int32 TotalSamples = NumSamplesX * NumSamplesY;
-
-	OutColors.Reserve(TotalSamples);
-	OutUVs.Reserve(TotalSamples);
-
-	// 运行时不直接访问纹理数据，返回占位数据
-	for (int32 Y = 0; Y < TextureHeight; Y += SampleStep)
-	{
-		for (int32 X = 0; X < TextureWidth; X += SampleStep)
-		{
-			OutColors.Add(FColor::Magenta);
-
-			FVector2D UV(
-				static_cast<float>(X) / TextureWidth,
-				static_cast<float>(Y) / TextureHeight
-			);
-			OutUVs.Add(UV);
-		}
-	}
+	UE_LOG(LogTemp, Warning, TEXT("GetPixelsByTexture only supports direct pixel extraction in editor builds. Returning empty results for runtime texture %s."), *GetNameSafe(Texture));
 #endif
 }
