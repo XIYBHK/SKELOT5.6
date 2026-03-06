@@ -1291,7 +1291,7 @@ void ASkelotWorld::SetInstanceCollisionChannel(FSkelotInstanceHandle H, uint8 Ch
 {
 	if (IsHandleValid(H))
 	{
-		SOA.CollisionChannels[H.InstanceIndex] = Channel;
+		SOA.CollisionChannels[H.InstanceIndex] = FMath::Min<uint8>(Channel, 7);
 	}
 }
 
@@ -1600,6 +1600,11 @@ bool ASkelotWorld::IsMeshAttached(int32 InstanceIndex, FName SubMeshName) const
 
 float ASkelotWorld::InstancePlayAnimation(int32 InstanceIndex, const FSkelotAnimPlayParams& Params)
 {
+	if (!IsInstanceAlive(InstanceIndex))
+	{
+		return -1;
+	}
+
 	if (!IsValid(Params.Animation))
 		return -1;
 
@@ -2358,8 +2363,18 @@ void ASkelotWorld::SolvePBDCollisions(float DeltaTime)
 	}
 	PBDUpdateFrameCounter = 0;
 
+	const FSkelotSpatialGrid* ActiveSpatialGrid = &SpatialGrid;
+	FSkelotSpatialGrid FallbackSpatialGrid;
+	if (!bEnableSpatialGrid)
+	{
+		const float FallbackCellSize = FMath::Max(PBDConfig.CollisionRadius * 2.0f * PBDConfig.GridCellSizeMultiplier, 1.0f);
+		FallbackSpatialGrid.SetCellSize(FallbackCellSize);
+		FallbackSpatialGrid.Rebuild(SOA, GetNumInstance());
+		ActiveSpatialGrid = &FallbackSpatialGrid;
+	}
+
 	// 执行PBD碰撞求解（实例间碰撞）
-	PBDCollisionSystem.SolveCollisions(SOA, GetNumInstance(), SpatialGrid, DeltaTime);
+	PBDCollisionSystem.SolveCollisions(SOA, GetNumInstance(), *ActiveSpatialGrid, DeltaTime);
 
 	// 执行障碍物碰撞求解
 	if (RegisteredObstacles.Num() > 0)
@@ -2400,8 +2415,18 @@ void ASkelotWorld::ComputeRVOAvoidance(float DeltaTime)
 		return;
 	}
 
+	const FSkelotSpatialGrid* ActiveSpatialGrid = &SpatialGrid;
+	FSkelotSpatialGrid FallbackSpatialGrid;
+	if (!bEnableSpatialGrid)
+	{
+		const float FallbackCellSize = FMath::Max(RVOConfig.NeighborRadius, PBDConfig.CollisionRadius * 2.0f);
+		FallbackSpatialGrid.SetCellSize(FallbackCellSize);
+		FallbackSpatialGrid.Rebuild(SOA, GetNumInstance());
+		ActiveSpatialGrid = &FallbackSpatialGrid;
+	}
+
 	// 执行 RVO 避障计算
-	RVOSystem.ComputeAvoidance(SOA, GetNumInstance(), SpatialGrid, DeltaTime, PBDConfig.CollisionRadius);
+	RVOSystem.ComputeAvoidance(SOA, GetNumInstance(), *ActiveSpatialGrid, DeltaTime, PBDConfig.CollisionRadius);
 }
 
 //////////////////////////////////////////////////////////////////////////

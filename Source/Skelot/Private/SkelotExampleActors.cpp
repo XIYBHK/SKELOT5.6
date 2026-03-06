@@ -1210,13 +1210,14 @@ void ASkelotExampleStressTest::UpdateInstanceMovement(float DeltaTime)
 
 	for (int32 i = 0; i < InstanceHandles.Num(); ++i)
 	{
-		if (!SkelotWorld->IsHandleValid(InstanceHandles[i]))
+		const FSkelotInstanceHandle Handle = InstanceHandles[i];
+		if (!SkelotWorld->IsHandleValid(Handle))
 		{
 			continue;
 		}
 
 		// 获取当前位置
-		FVector CurrentLoc = SkelotWorld->GetInstanceLocation(InstanceHandles[i].InstanceIndex);
+		FVector CurrentLoc = SkelotWorld->GetInstanceLocation(Handle.InstanceIndex);
 
 		// 检查是否超出范围
 		FVector ToCenter = GetActorLocation() - CurrentLoc;
@@ -1237,19 +1238,30 @@ void ASkelotExampleStressTest::UpdateInstanceMovement(float DeltaTime)
 		}
 
 		// 设置速度
-		FVector3f Velocity = FVector3f(MoveDir * MoveSpeed);
-		Indices.Add(InstanceHandles[i].InstanceIndex);
-		Velocities.Add(Velocity);
+		const FVector3f DesiredVelocity = FVector3f(MoveDir * MoveSpeed);
+		const FVector3f CurrentVelocity = SkelotWorld->GetInstanceVelocity(Handle);
+		Indices.Add(Handle.InstanceIndex);
+		Velocities.Add(DesiredVelocity);
 
-		// 更新位置
-		FVector NewLoc = CurrentLoc + MoveDir * MoveSpeed * DeltaTime;
-		SkelotWorld->SetInstanceLocation(InstanceHandles[i].InstanceIndex, NewLoc);
+		FVector AppliedVelocity = FVector(DesiredVelocity);
+		if (TestMode >= 2)
+		{
+			AppliedVelocity = FVector(CurrentVelocity);
+			if (AppliedVelocity.IsNearlyZero())
+			{
+				AppliedVelocity = FVector(DesiredVelocity);
+			}
+		}
+
+		FVector NewLoc = CurrentLoc + AppliedVelocity * DeltaTime;
+		SkelotWorld->SetInstanceLocation(Handle.InstanceIndex, NewLoc);
 
 		// 朝向移动方向
-		if (!MoveDir.IsNearlyZero())
+		const FVector FacingDirection = AppliedVelocity.IsNearlyZero() ? MoveDir : AppliedVelocity.GetSafeNormal();
+		if (!FacingDirection.IsNearlyZero())
 		{
-			FQuat TargetRotation = FRotationMatrix::MakeFromX(MoveDir).Rotator().Quaternion();
-			SkelotWorld->SetInstanceRotation(InstanceHandles[i].InstanceIndex, FQuat4f(TargetRotation));
+			FQuat TargetRotation = FRotationMatrix::MakeFromX(FacingDirection).Rotator().Quaternion();
+			SkelotWorld->SetInstanceRotation(Handle.InstanceIndex, FQuat4f(TargetRotation));
 		}
 	}
 

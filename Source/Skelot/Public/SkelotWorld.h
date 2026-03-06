@@ -93,8 +93,8 @@ public:
 
 	// 分帧更新步长（来自预研文档）
 	// 1 = 每帧完整更新（默认，最准确）
-	// 2 = 分2帧更新（降低50%计算量，数据有一帧延迟）
-	// 4 = 分4帧更新（降低75%计算量，数据有最多3帧延迟）
+	// 2 = 每2帧完整重建一次（降低50%计算量，数据有一帧延迟）
+	// 4 = 每4帧完整重建一次（降低75%计算量，数据有最多3帧延迟）
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skelot|空间查询", meta = (DisplayName = "分帧更新步长", ClampMin = "1", ClampMax = "4"))
 	int32 SpatialGridFrameStride = 1;
 
@@ -171,11 +171,17 @@ public:
 	//return true if handle is valid
 	bool IsHandleValid(FSkelotInstanceHandle H) const
 	{
-		const FSkelotInstancesSOA::FSlotData& Slot = SOA.Slots[H.InstanceIndex & InstanceIndexMask];
-		return H.Version == Slot.Version;
+		if (!H.IsValid() || !SOA.Slots.IsValidIndex(H.InstanceIndex))
+		{
+			return false;
+		}
+
+		const FSkelotInstancesSOA::FSlotData& Slot = SOA.Slots[H.InstanceIndex];
+		return H.Version == Slot.Version && !Slot.bDestroyed;
 	}
+	bool IsValidInstanceIndex(int32 InstanceIndex) const { return SOA.Slots.IsValidIndex(InstanceIndex); }
 	//checks the validity bit only
-	bool IsInstanceAlive(int32 InstanceIndex) const { return !SOA.Slots[InstanceIndex].bDestroyed; }
+	bool IsInstanceAlive(int32 InstanceIndex) const { return IsValidInstanceIndex(InstanceIndex) && !SOA.Slots[InstanceIndex].bDestroyed; }
 	//returns number of instances (including destroyed ones)
 	int32 GetNumInstance() const { return HandleAllocator.GetMaxSize(); }
 	//returns number of valid instances
@@ -249,16 +255,16 @@ public:
 
 
 	//
-	UAnimSequenceBase* GetPlayingAnimSequence(int32 InstanceIndex) const { return SOA.AnimDatas[InstanceIndex].CurrentAsset; }
+	UAnimSequenceBase* GetPlayingAnimSequence(int32 InstanceIndex) const { return IsInstanceAlive(InstanceIndex) ? SOA.AnimDatas[InstanceIndex].CurrentAsset : nullptr; }
 	//returns true if the specified animation is being played by the the instance
-	bool IsPlayingAnimation(int32 InstanceIndex, const UAnimSequenceBase* Animation) const { return SOA.AnimDatas[InstanceIndex].CurrentAsset == Animation; }
+	bool IsPlayingAnimation(int32 InstanceIndex, const UAnimSequenceBase* Animation) const { return IsInstanceAlive(InstanceIndex) && SOA.AnimDatas[InstanceIndex].CurrentAsset == Animation; }
 	//returns true if the specified instance is playing any animation
-	bool IsPlayingAnyAnimation(int32 InstanceIndex) const { return SOA.AnimDatas[InstanceIndex].CurrentAsset != nullptr; }
+	bool IsPlayingAnyAnimation(int32 InstanceIndex) const { return IsInstanceAlive(InstanceIndex) && SOA.AnimDatas[InstanceIndex].CurrentAsset != nullptr; }
 	
 	//returns the length of currently playing AnimSequence
 	float GetInstancePlayLength(int32 InstanceIndex) const;
 	//
-	float GetInstancePlayTime(int32 InstanceIndex) const { return SOA.AnimDatas[InstanceIndex].AnimationTime; }
+	float GetInstancePlayTime(int32 InstanceIndex) const { return IsInstanceAlive(InstanceIndex) ? SOA.AnimDatas[InstanceIndex].AnimationTime : 0.0f; }
 	//
 	float GetInstancePlayTimeRemaining(int32 InstanceIndex) const;
 	//
@@ -266,56 +272,68 @@ public:
 	//
 	float GetInstancePlayTimeRemainingFraction(int32 InstanceIndex) const { return 1.0f - GetInstancePlayTimeFraction(InstanceIndex); }
 	//
-	void SetAnimationLooped(int32 InstanceIndex, bool bLoop) { SOA.Slots[InstanceIndex].bAnimationLooped = bLoop; }
-	bool IsAnimationLooped(int32 InstanceIndex) const { return SOA.Slots[InstanceIndex].bAnimationLooped; }
+	void SetAnimationLooped(int32 InstanceIndex, bool bLoop) { if (IsInstanceAlive(InstanceIndex)) { SOA.Slots[InstanceIndex].bAnimationLooped = bLoop; } }
+	bool IsAnimationLooped(int32 InstanceIndex) const { return IsInstanceAlive(InstanceIndex) && SOA.Slots[InstanceIndex].bAnimationLooped; }
 	//
-	void SetAnimationPaused(int32 InstanceIndex, bool bPause) { SOA.Slots[InstanceIndex].bAnimationPaused = bPause; }
+	void SetAnimationPaused(int32 InstanceIndex, bool bPause) { if (IsInstanceAlive(InstanceIndex)) { SOA.Slots[InstanceIndex].bAnimationPaused = bPause; } }
 
 	//
 	USkelotAnimCollection* GetInstanceAnimCollection(int32 InstanceIndex) const;
 	USkelotAnimCollection* GetInstanceAnimCollection(FSkelotInstanceHandle H) const;
 
 	//returns world space location of the instance
-	inline FVector GetInstanceLocation(int32 InstanceIndex) const				{ return SOA.Locations[InstanceIndex]; }
+	inline FVector GetInstanceLocation(int32 InstanceIndex) const				{ return IsInstanceAlive(InstanceIndex) ? FVector(SOA.Locations[InstanceIndex]) : FVector::ZeroVector; }
 	//returns world space rotation of the instance
-	inline FQuat4f GetInstanceRotation(int32 InstanceIndex) const				{ return SOA.Rotations[InstanceIndex]; }
+	inline FQuat4f GetInstanceRotation(int32 InstanceIndex) const				{ return IsInstanceAlive(InstanceIndex) ? SOA.Rotations[InstanceIndex] : FQuat4f::Identity; }
 	//returns world space transform of the instance
-	inline FTransform GetInstanceTransform(int32 InstanceIndex) const			{ return FTransform((FQuat4d)SOA.Rotations[InstanceIndex], SOA.Locations[InstanceIndex], (FVector3d)SOA.Scales[InstanceIndex]); }
+	inline FTransform GetInstanceTransform(int32 InstanceIndex) const			{ return IsInstanceAlive(InstanceIndex) ? FTransform((FQuat4d)SOA.Rotations[InstanceIndex], SOA.Locations[InstanceIndex], (FVector3d)SOA.Scales[InstanceIndex]) : FTransform::Identity; }
 	//
-	inline FTransform GetInstancePrevTransform(int32 InstanceIndex) const		{ return FTransform((FQuat4d)SOA.PrevRotations[InstanceIndex], SOA.PrevLocations[InstanceIndex], (FVector3d)SOA.PrevScales[InstanceIndex]); }
+	inline FTransform GetInstancePrevTransform(int32 InstanceIndex) const		{ return IsInstanceAlive(InstanceIndex) ? FTransform((FQuat4d)SOA.PrevRotations[InstanceIndex], SOA.PrevLocations[InstanceIndex], (FVector3d)SOA.PrevScales[InstanceIndex]) : FTransform::Identity; }
 	//
 	inline void SetInstanceTransform(int32 InstanceIndex, const FTransform& T)	
 	{
-		SOA.Locations[InstanceIndex] = T.GetLocation(); 
-		SOA.Rotations[InstanceIndex] = (FQuat4f)T.GetRotation();
-		SOA.Scales[InstanceIndex]	 = (FVector3f)T.GetScale3D();
+		if (IsInstanceAlive(InstanceIndex))
+		{
+			SOA.Locations[InstanceIndex] = T.GetLocation(); 
+			SOA.Rotations[InstanceIndex] = (FQuat4f)T.GetRotation();
+			SOA.Scales[InstanceIndex]	 = (FVector3f)T.GetScale3D();
+		}
 	}
 	//
 	inline void SetInstanceLocation(int32 InstanceIndex, const FVector& L)
 	{
-		SOA.Locations[InstanceIndex] = L;
+		if (IsInstanceAlive(InstanceIndex))
+		{
+			SOA.Locations[InstanceIndex] = L;
+		}
 	}
 	//
 	inline void SetInstanceRotation(int32 InstanceIndex, const FQuat4f& Q)
 	{
-		SOA.Rotations[InstanceIndex] = Q;
+		if (IsInstanceAlive(InstanceIndex))
+		{
+			SOA.Rotations[InstanceIndex] = Q;
+		}
 	}
 	//
 	inline void SetInstanceLocationAndRotation(int32 InstanceIndex, const FVector& L, const FQuat4f& Q)
 	{
-		SOA.Locations[InstanceIndex] = L;
-		SOA.Rotations[InstanceIndex] = Q;
+		if (IsInstanceAlive(InstanceIndex))
+		{
+			SOA.Locations[InstanceIndex] = L;
+			SOA.Rotations[InstanceIndex] = Q;
+		}
 	}
 
 	//////////////////////////////////////////////////////////////////////////
 	// Velocity API - for PBD collision and RVO avoidance systems
 
 	//returns velocity of the instance
-	inline FVector3f GetInstanceVelocity(int32 InstanceIndex) const { return SOA.Velocities[InstanceIndex]; }
+	inline FVector3f GetInstanceVelocity(int32 InstanceIndex) const { return IsInstanceAlive(InstanceIndex) ? SOA.Velocities[InstanceIndex] : FVector3f::ZeroVector; }
 	//returns velocity of the instance (handle version)
 	FVector3f GetInstanceVelocity(FSkelotInstanceHandle H) const { return IsHandleValid(H) ? SOA.Velocities[H.InstanceIndex] : FVector3f::ZeroVector; }
 	//sets velocity of the instance
-	inline void SetInstanceVelocity(int32 InstanceIndex, const FVector3f& V) { SOA.Velocities[InstanceIndex] = V; }
+	inline void SetInstanceVelocity(int32 InstanceIndex, const FVector3f& V) { if (IsInstanceAlive(InstanceIndex)) { SOA.Velocities[InstanceIndex] = V; } }
 	//sets velocity of the instance (handle version)
 	void SetInstanceVelocity(FSkelotInstanceHandle H, const FVector3f& V);
 	//batch set velocities for multiple instances (performance optimized)
@@ -327,20 +345,20 @@ public:
 	// Collision Channel API - for PBD collision and RVO avoidance systems
 
 	//returns collision channel of the instance (0-7, maps to ESkelotCollisionChannel)
-	inline uint8 GetInstanceCollisionChannel(int32 InstanceIndex) const { return SOA.CollisionChannels[InstanceIndex]; }
+	inline uint8 GetInstanceCollisionChannel(int32 InstanceIndex) const { return IsInstanceAlive(InstanceIndex) ? SOA.CollisionChannels[InstanceIndex] : SkelotCollision::DefaultCollisionChannel; }
 	//returns collision channel of the instance (handle version)
 	uint8 GetInstanceCollisionChannel(FSkelotInstanceHandle H) const;
 	//sets collision channel of the instance
-	inline void SetInstanceCollisionChannel(int32 InstanceIndex, uint8 Channel) { SOA.CollisionChannels[InstanceIndex] = Channel; }
+	inline void SetInstanceCollisionChannel(int32 InstanceIndex, uint8 Channel) { if (IsInstanceAlive(InstanceIndex)) { SOA.CollisionChannels[InstanceIndex] = FMath::Min<uint8>(Channel, 7); } }
 	//sets collision channel of the instance (handle version)
 	void SetInstanceCollisionChannel(FSkelotInstanceHandle H, uint8 Channel);
 
 	//returns collision mask of the instance (bit flags for which channels to collide with)
-	inline uint8 GetInstanceCollisionMask(int32 InstanceIndex) const { return SOA.CollisionMasks[InstanceIndex]; }
+	inline uint8 GetInstanceCollisionMask(int32 InstanceIndex) const { return IsInstanceAlive(InstanceIndex) ? SOA.CollisionMasks[InstanceIndex] : SkelotCollision::DefaultCollisionMask; }
 	//returns collision mask of the instance (handle version)
 	uint8 GetInstanceCollisionMask(FSkelotInstanceHandle H) const;
 	//sets collision mask of the instance
-	inline void SetInstanceCollisionMask(int32 InstanceIndex, uint8 Mask) { SOA.CollisionMasks[InstanceIndex] = Mask; }
+	inline void SetInstanceCollisionMask(int32 InstanceIndex, uint8 Mask) { if (IsInstanceAlive(InstanceIndex)) { SOA.CollisionMasks[InstanceIndex] = Mask; } }
 	//sets collision mask of the instance (handle version)
 	void SetInstanceCollisionMask(FSkelotInstanceHandle H, uint8 Mask);
 
@@ -427,6 +445,7 @@ public:
 	//
 	float* GetInstanceCustomDataFloats(int32 InstanceIndex)
 	{
+		check(IsValidInstanceIndex(InstanceIndex));
 		//intentionally not [] operator because might be: PerInstanceCustomData.Num() == 0 && MaxNumCustomDataFloat == 0
 		return this->SOA.PerInstanceCustomData.GetData() + (InstanceIndex * SOA.MaxNumCustomDataFloat);
 	}
@@ -438,20 +457,22 @@ public:
 	template<typename T> T& GetInstanceUserDataAs(int32 InstanceIndex) 
 	{
 		static_assert(sizeof(T) <= sizeof(FSkelotInstancesSOA::FUserData));
+		check(IsValidInstanceIndex(InstanceIndex));
 		return *reinterpret_cast<T*>(&SOA.UserData[InstanceIndex]); 
 	}
 	//
 	template<typename T> const T& GetInstanceUserDataAs(int32 InstanceIndex) const 
 	{
 		static_assert(sizeof(T) <= sizeof(FSkelotInstancesSOA::FUserData));
+		check(IsValidInstanceIndex(InstanceIndex));
 		return *reinterpret_cast<T*>(&SOA.UserData[InstanceIndex]); 
 	}
 
 
 	//
-	uint32 GetInstanceVersion(int32 InstanceIndex) const { return SOA.Slots[InstanceIndex].Version; }
+	uint32 GetInstanceVersion(int32 InstanceIndex) const { return IsValidInstanceIndex(InstanceIndex) ? SOA.Slots[InstanceIndex].Version : 0; }
 	//converts instance index to handle
-	FSkelotInstanceHandle IndexToHandle(int32 InstanceIndex) const { return FSkelotInstanceHandle { InstanceIndex, SOA.Slots[InstanceIndex].Version }; }
+	FSkelotInstanceHandle IndexToHandle(int32 InstanceIndex) const { return IndexToHandle_Safe(InstanceIndex); }
 	//
 	FSkelotInstanceHandle IndexToHandle_Safe(int32 InstanceIndex) const 
 	{
@@ -515,7 +536,7 @@ public:
 
 	/**
 	 * 设置空间网格分帧更新步长（来自预研文档）
-	 * @param Stride 步长（1=每帧更新，2=分2帧更新降低50%计算，4=分4帧更新降低75%计算）
+	 * @param Stride 步长（1=每帧重建，2=每2帧重建一次降低50%计算，4=每4帧重建一次降低75%计算）
 	 */
 	void SetSpatialGridFrameStride(int32 Stride);
 
@@ -753,7 +774,7 @@ public:
 	//will fail if dynamic pose buffer is full. see USkelotAnimCollection.MaxDynamicPose 
 	bool EnableInstanceDynamicPose(int32 InstanceIndex, bool bEnable);
 	//
-	bool IsInstanceDynamicPose(int32 InstanceIndex) const { return SOA.Slots[InstanceIndex].bDynamicPose; }
+	bool IsInstanceDynamicPose(int32 InstanceIndex) const { return IsInstanceAlive(InstanceIndex) && SOA.Slots[InstanceIndex].bDynamicPose; }
 	//make an Skelot instance to take its bones from the specified USkeletalMeshComponent. usually used for ragdolls or advanced animations that need AnimBP
 	//Note: dynamic pose must be enabled by EnableInstanceDynamicPose first .
 	bool TieDynamicPoseToComponent(int32 InstanceIndex /* dynamic-pose-enabled instance*/, USkeletalMeshComponent* SrcComponent /* component to take bones from*/, int32 UserData, bool bCopyTransform);

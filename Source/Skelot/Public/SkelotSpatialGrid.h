@@ -19,8 +19,8 @@
  * 分帧更新说明：
  * - 使用 FrameStride 参数控制分帧更新频率
  * - FrameStride=1: 每帧完整更新（默认）
- * - FrameStride=2: 每帧更新一半实例，降低50%计算量
- * - 注意：分帧更新会导致网格数据有一帧延迟，对大多数应用场景可接受
+ * - FrameStride=2: 每2帧完整重建一次，降低约50%重建开销
+ * - 注意：分帧更新不是分批更新实例，而是延迟整表重建，对大多数应用场景可接受
  */
 class FSkelotSpatialGrid
 {
@@ -38,7 +38,7 @@ public:
 
 	/**
 	 * 设置分帧更新步长
-	 * @param Stride 步长（1=每帧更新，2=分2帧更新，4=分4帧更新）
+	 * @param Stride 步长（1=每帧重建，2=每2帧重建一次，4=每4帧重建一次）
 	 */
 	void SetFrameStride(int32 Stride);
 
@@ -66,7 +66,7 @@ public:
 	void Rebuild(const FSkelotInstancesSOA& SOA, int32 NumInstances);
 
 	/**
-	 * 分帧更新网格（只更新当前帧对应的实例批次）
+	 * 分帧更新网格（按步长延迟完整重建）
 	 * 基于预研文档的 FrameStride 方案
 	 * @param SOA 实例数据数组
 	 * @param NumInstances 实例总数
@@ -141,7 +141,7 @@ private:
 	/** 网格单元大小的倒数 */
 	float InvCellSize;
 
-	/** 分帧更新步长（1=每帧更新，2=分2帧更新） */
+	/** 分帧更新步长（1=每帧重建，2=每2帧重建一次） */
 	int32 FrameStride;
 
 	/** 当前帧索引（用于分帧更新） */
