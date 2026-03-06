@@ -93,8 +93,16 @@ public:
 	// 记录回退网格上次构建的帧，避免同帧重复整表重建
 	mutable uint64 FallbackSpatialGridFrame = MAX_uint64;
 
-	// 复用的空间查询索引缓冲，减少 QuerySphere/QueryBox 的局部分配
-	mutable TArray<int32> SpatialQueryScratchIndices;
+	struct FPendingVelocityAdvance
+	{
+		FVector3f DesiredVelocity = FVector3f::ZeroVector;
+		float DeltaTime = 0.0f;
+		bool bPreferCurrentVelocityForMovement = false;
+		bool bRotateToMovement = true;
+	};
+
+	// 等待在 world tick 中统一积分的位置更新，确保先求解 RVO/PBD 再推进位移
+	TMap<int32, FPendingVelocityAdvance> PendingVelocityAdvances;
 
 	// 是否启用空间网格优化
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skelot|空间查询", meta = (DisplayName = "启用空间网格"))
@@ -349,8 +357,9 @@ public:
 	void SetInstanceVelocities(const TArray<int32>& InstanceIndices, const TArray<FVector3f>& Velocities);
 	//batch set velocities using handles
 	void SetInstanceVelocities(const TArray<FSkelotInstanceHandle>& Handles, const TArray<FVector3f>& Velocities);
-	//batch integrate locations/rotations from desired velocities; optionally prefer existing adjusted velocity for movement
+	//queue batch movement update from desired velocities; world tick will integrate after RVO/PBD
 	void AdvanceInstancesByVelocity(const TArray<int32>& InstanceIndices, const TArray<FVector3f>& DesiredVelocities, float DeltaTime, bool bPreferCurrentVelocityForMovement, bool bRotateToMovement = true);
+	void ConsumePendingVelocityAdvances();
 
 	//////////////////////////////////////////////////////////////////////////
 	// Collision Channel API - for PBD collision and RVO avoidance systems

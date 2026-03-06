@@ -60,6 +60,11 @@ class FSkelotClusterProxy;
 
 double GSkelot_InvClusterCellSize = 1;
 
+namespace
+{
+	thread_local TArray<int32> GSkelotSpatialQueryScratchIndices;
+}
+
 
 
 
@@ -1281,15 +1286,11 @@ void ASkelotWorld::SetInstanceVelocities(const TArray<FSkelotInstanceHandle>& Ha
 
 void ASkelotWorld::AdvanceInstancesByVelocity(const TArray<int32>& InstanceIndices, const TArray<FVector3f>& DesiredVelocities, float DeltaTime, bool bPreferCurrentVelocityForMovement, bool bRotateToMovement /*= true*/)
 {
+	check(IsInGameThread());
+
 	if (InstanceIndices.Num() != DesiredVelocities.Num())
 	{
 		UE_LOG(LogSkelot, Warning, TEXT("AdvanceInstancesByVelocity: size mismatch (%d vs %d)"), InstanceIndices.Num(), DesiredVelocities.Num());
-		return;
-	}
-
-	if (DeltaTime <= 0.0f)
-	{
-		SetInstanceVelocities(InstanceIndices, DesiredVelocities);
 		return;
 	}
 
@@ -1301,21 +1302,51 @@ void ASkelotWorld::AdvanceInstancesByVelocity(const TArray<int32>& InstanceIndic
 			continue;
 		}
 
-		const FVector3f DesiredVelocity = DesiredVelocities[i];
-		FVector3f AppliedVelocity = DesiredVelocity;
-		if (bPreferCurrentVelocityForMovement)
+		FPendingVelocityAdvance& PendingAdvance = PendingVelocityAdvances.FindOrAdd(InstanceIndex);
+		PendingAdvance.DesiredVelocity = DesiredVelocities[i];
+		PendingAdvance.DeltaTime = DeltaTime;
+		PendingAdvance.bPreferCurrentVelocityForMovement = bPreferCurrentVelocityForMovement;
+		PendingAdvance.bRotateToMovement = bRotateToMovement;
+
+		// 立即写入目标速度，确保同帧的 RVO/PBD 求解能读取到最新输入
+		SOA.Velocities[InstanceIndex] = DesiredVelocities[i];
+	}
+}
+
+void ASkelotWorld::ConsumePendingVelocityAdvances()
+{
+	check(IsInGameThread());
+
+	if (PendingVelocityAdvances.Num() == 0)
+	{
+		return;
+	}
+
+	for (const TPair<int32, FPendingVelocityAdvance>& PendingPair : PendingVelocityAdvances)
+	{
+		const int32 InstanceIndex = PendingPair.Key;
+		if (!IsInstanceAlive(InstanceIndex))
+		{
+			continue;
+		}
+
+		const FPendingVelocityAdvance& PendingAdvance = PendingPair.Value;
+		FVector3f AppliedVelocity = PendingAdvance.DesiredVelocity;
+		if (PendingAdvance.bPreferCurrentVelocityForMovement)
 		{
 			AppliedVelocity = SOA.Velocities[InstanceIndex];
 			if (AppliedVelocity.IsNearlyZero())
 			{
-				AppliedVelocity = DesiredVelocity;
+				AppliedVelocity = PendingAdvance.DesiredVelocity;
 			}
 		}
 
-		SOA.Velocities[InstanceIndex] = DesiredVelocity;
-		SOA.Locations[InstanceIndex] += FVector(AppliedVelocity) * DeltaTime;
+		if (PendingAdvance.DeltaTime > 0.0f)
+		{
+			SOA.Locations[InstanceIndex] += FVector(AppliedVelocity) * PendingAdvance.DeltaTime;
+		}
 
-		if (bRotateToMovement)
+		if (PendingAdvance.bRotateToMovement)
 		{
 			const FVector FacingDirection = FVector(AppliedVelocity).GetSafeNormal();
 			if (!FacingDirection.IsNearlyZero())
@@ -1325,6 +1356,8 @@ void ASkelotWorld::AdvanceInstancesByVelocity(const TArray<int32>& InstanceIndic
 			}
 		}
 	}
+
+	PendingVelocityAdvances.Reset();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -2284,10 +2317,10 @@ void ASkelotWorld::QueryLocationOverlappingSphere(const FVector& Center, float R
 	// 使用空间网格优化查询
 	if (bEnableSpatialGrid && SpatialGrid.GetNumCells() > 0)
 	{
-		SpatialQueryScratchIndices.Reset();
-		SpatialGrid.QuerySphere(Center, Radius, SpatialQueryScratchIndices, 0xFF, &SOA);
-		Instances.Reserve(Instances.Num() + SpatialQueryScratchIndices.Num());
-		for (int32 Idx : SpatialQueryScratchIndices)
+		GSkelotSpatialQueryScratchIndices.Reset();
+		SpatialGrid.QuerySphere(Center, Radius, GSkelotSpatialQueryScratchIndices, 0xFF, &SOA);
+		Instances.Reserve(Instances.Num() + GSkelotSpatialQueryScratchIndices.Num());
+		for (int32 Idx : GSkelotSpatialQueryScratchIndices)
 		{
 			Instances.Add(IndexToHandle(Idx));
 		}
@@ -2316,10 +2349,10 @@ void ASkelotWorld::QueryLocationOverlappingSphereWithMask(const FVector& Center,
 	// 使用空间网格优化查询
 	if (bEnableSpatialGrid && SpatialGrid.GetNumCells() > 0)
 	{
-		SpatialQueryScratchIndices.Reset();
-		SpatialGrid.QuerySphere(Center, Radius, SpatialQueryScratchIndices, CollisionMask, &SOA);
-		OutInstances.Reserve(OutInstances.Num() + SpatialQueryScratchIndices.Num());
-		for (int32 Idx : SpatialQueryScratchIndices)
+		GSkelotSpatialQueryScratchIndices.Reset();
+		SpatialGrid.QuerySphere(Center, Radius, GSkelotSpatialQueryScratchIndices, CollisionMask, &SOA);
+		OutInstances.Reserve(OutInstances.Num() + GSkelotSpatialQueryScratchIndices.Num());
+		for (int32 Idx : GSkelotSpatialQueryScratchIndices)
 		{
 			OutInstances.Add(IndexToHandle(Idx));
 		}
@@ -2363,10 +2396,10 @@ void ASkelotWorld::QueryLocationOverlappingBoxWithMask(const FVector& BoxCenter,
 	// 使用空间网格优化查询
 	if (bEnableSpatialGrid && SpatialGrid.GetNumCells() > 0)
 	{
-		SpatialQueryScratchIndices.Reset();
-		SpatialGrid.QueryBox(BoxCenter, BoxExtent, SpatialQueryScratchIndices, CollisionMask, &SOA);
-		OutInstances.Reserve(OutInstances.Num() + SpatialQueryScratchIndices.Num());
-		for (int32 Idx : SpatialQueryScratchIndices)
+		GSkelotSpatialQueryScratchIndices.Reset();
+		SpatialGrid.QueryBox(BoxCenter, BoxExtent, GSkelotSpatialQueryScratchIndices, CollisionMask, &SOA);
+		OutInstances.Reserve(OutInstances.Num() + GSkelotSpatialQueryScratchIndices.Num());
+		for (int32 Idx : GSkelotSpatialQueryScratchIndices)
 		{
 			OutInstances.Add(IndexToHandle(Idx));
 		}
@@ -2435,6 +2468,8 @@ void ASkelotWorld::RebuildSpatialGrid()
 
 const FSkelotSpatialGrid& ASkelotWorld::GetNeighborQuerySpatialGrid() const
 {
+	check(IsInGameThread());
+
 	if (bEnableSpatialGrid)
 	{
 		return SpatialGrid;
@@ -3341,6 +3376,7 @@ void ASkelotWorld::OnWorldPostActorTick(ELevelTick TickType, float DeltaSeconds)
 
 	GSkelot_InvClusterCellSize = GSkelot_ClusterCellSize > 0 ? (1.0f / GSkelot_ClusterCellSize) : 0;
 
+	ConsumePendingVelocityAdvances();
 	TickLifeSpans();
 
 	Impl()->UpdateHierarchyTransforms(DeltaSeconds);
