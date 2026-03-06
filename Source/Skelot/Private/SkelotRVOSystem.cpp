@@ -8,7 +8,13 @@
 
 // 数学常数
 static constexpr float RVO_EPSILON = 0.00001f;
-static constexpr float RVO_SQUARE_ROOT_EPSILON = 0.00001f;
+
+// 2D 行列式（叉积）：det(A, B) = A.x*B.y - A.y*B.x
+// 对应 RVO2 库中的 det() 函数，用于半平面约束判定
+static FORCEINLINE float Det2D(const FVector2f& A, const FVector2f& B)
+{
+	return A.X * B.Y - A.Y * B.X;
+}
 
 FSkelotRVOSystem::FSkelotRVOSystem()
 	: ProcessedAgents(0)
@@ -163,42 +169,31 @@ bool FSkelotRVOSystem::ComputeAgentAvoidance(const FSkelotInstancesSOA& SOA, int
 {
 	OutNewVelocity = InputVelocities[InstanceIndex];
 
-	// 获取当前位置和速度
 	const FVector3d& MyPos3D = SOA.Locations[InstanceIndex];
 	const FVector3f& MyVel3D = InputVelocities[InstanceIndex];
 
-	// 转换为 3D（XY 平面）
 	FVector3f MyPos(MyPos3D.X, MyPos3D.Y, 0.0f);
 	FVector3f MyVel(MyVel3D.X, MyVel3D.Y, 0.0f);
 
-	// 获取当前速度大小
 	float CurrentSpeed = MyVel.Size();
-
-	// 如果速度为零，不需要避障
 	if (CurrentSpeed < RVO_EPSILON)
 	{
 		return false;
 	}
 
-	// 计算期望速度（保持当前方向）
 	FVector2f PreferredVelocity(MyVel.X, MyVel.Y);
 
-	// 计算最大速度
 	float MaxSpeed = Config.MaxSpeed > 0 ? Config.MaxSpeed : CurrentSpeed;
 	MaxSpeed = FMath::Max(MaxSpeed, Config.MinSpeed);
 
-	// 使用空间网格查询邻居
 	LocalNeighborIndices.Reset();
 	SpatialGrid.QuerySphere(FVector(MyPos3D), Config.NeighborRadius, LocalNeighborIndices);
 
-	// 限制邻居数量
 	int32 NumNeighbors = FMath::Min(LocalNeighborIndices.Num(), Config.MaxNeighbors);
 
-	// 获取或创建代理数据
 	FRVOAgentData& AgentData = GetOrCreateAgentData(InstanceIndex);
 	AgentData.CurrentNeighborCount = NumNeighbors;
 
-	// 构建 ORCA 平面
 	LocalORCAPlanes.Reset();
 	float CombinedRadius = CurrentCollisionRadius * 2.0f;
 
@@ -206,430 +201,171 @@ bool FSkelotRVOSystem::ComputeAgentAvoidance(const FSkelotInstancesSOA& SOA, int
 	{
 		int32 NeighborIdx = LocalNeighborIndices[i];
 
-		// 跳过自己
 		if (NeighborIdx == InstanceIndex)
 		{
 			continue;
 		}
 
-		// 跳过已销毁的实例
 		if (SOA.Slots[NeighborIdx].bDestroyed)
 		{
 			continue;
 		}
 
-		// 检查碰撞过滤
 		if (!ShouldAvoid(SOA, InstanceIndex, NeighborIdx))
 		{
 			continue;
 		}
 
-		// 获取邻居数据
 		const FVector3d& NeighborPos3D = SOA.Locations[NeighborIdx];
 		const FVector3f& NeighborVel3D = InputVelocities[NeighborIdx];
 
 		FVector3f NeighborPos(NeighborPos3D.X, NeighborPos3D.Y, 0.0f);
 		FVector3f NeighborVel(NeighborVel3D.X, NeighborVel3D.Y, 0.0f);
 
-		// 构建 ORCA 平面
 		FORCAPlane Plane;
-		ComputeORCAPlane(MyPos, MyVel, NeighborPos, NeighborVel, CombinedRadius, Plane);
+		ComputeORCAPlane(MyPos, MyVel, NeighborPos, NeighborVel, CombinedRadius, DeltaTime, Plane);
 		LocalORCAPlanes.Add(Plane);
 	}
 
-	// 使用线性规划求解最优速度
+	// LP2 求解：返回失败行号，成功时等于 Planes.Num()
 	FVector2f NewVelocity2D;
-	bool bFoundSolution = LinearProgram(LocalORCAPlanes, PreferredVelocity, MaxSpeed, NewVelocity2D);
+	const int32 LineFail = LinearProgram2(LocalORCAPlanes, MaxSpeed, PreferredVelocity, false, NewVelocity2D);
 
-	if (!bFoundSolution)
+	if (LineFail < LocalORCAPlanes.Num())
 	{
-		// 无解时，使用期望速度但限制在最大速度内
-		NewVelocity2D = PreferredVelocity.GetSafeNormal() * FMath::Min(PreferredVelocity.Size(), MaxSpeed);
+		LinearProgram3(LocalORCAPlanes, LineFail, MaxSpeed, NewVelocity2D);
 	}
 
-	// 转换回 3D
 	OutNewVelocity = FVector3f(NewVelocity2D.X, NewVelocity2D.Y, 0.0f);
 
-	// 应用抗抖动处理
 	ApplyAntiJitter(InstanceIndex, InputVelocities[InstanceIndex], OutNewVelocity, DeltaTime, NumNeighbors);
 
-	// 确保 Z 轴速度为零（2D 运动）
 	OutNewVelocity.Z = 0.0f;
 
 	return true;
 }
 
 //////////////////////////////////////////////////////////////////////////
-// ORCA Plane Computation
+// ORCA Plane Computation (参照 RVO2 Agent::computeNewVelocity)
 //////////////////////////////////////////////////////////////////////////
 
 void FSkelotRVOSystem::ComputeORCAPlane(const FVector3f& PosA, const FVector3f& VelA,
-											  const FVector3f& PosB, const FVector3f& VelB,
-											  float CombinedRadius,
-											  FORCAPlane& OutPlane)
+										const FVector3f& PosB, const FVector3f& VelB,
+										float CombinedRadius, float DeltaTime,
+										FORCAPlane& OutPlane)
 {
-	// 如果启用了 HRVO 混合模式，使用 HRVO 算法
+	FVector2f RelPos2D(PosB.X - PosA.X, PosB.Y - PosA.Y);
+	FVector2f RelVel2D(VelA.X - VelB.X, VelA.Y - VelB.Y);
+	FVector2f MyVel2D(VelA.X, VelA.Y);
+
+	float ResponsibilityFactor = 0.5f;
+
 	if (Config.bEnableHRVO)
 	{
-		ComputeHRVOPlane(PosA, VelA, PosB, VelB, CombinedRadius, OutPlane);
-		return;
+		if (IsHeadOnCollision(RelPos2D, RelVel2D))
+		{
+			ResponsibilityFactor = 1.0f;
+		}
 	}
 
-	// 默认使用 RVO（标准 ORCA 算法）
-	// 计算相对位置和速度
-	FVector3f RelativePosition = PosB - PosA;
-	FVector3f RelativeVelocity = VelA - VelB;
+	ComputeORCAPlaneInternal(RelPos2D, RelVel2D, MyVel2D, CombinedRadius, DeltaTime, ResponsibilityFactor, OutPlane);
+}
 
-	// 2D 投影
-	FVector2f RelPos2D(RelativePosition.X, RelativePosition.Y);
-	FVector2f RelVel2D(RelativeVelocity.X, RelativeVelocity.Y);
+void FSkelotRVOSystem::ComputeORCAPlaneInternal(const FVector2f& RelPos2D, const FVector2f& RelVel2D,
+												const FVector2f& MyVel2D,
+												float CombinedRadius, float DeltaTime,
+												float ResponsibilityFactor,
+												FORCAPlane& OutPlane)
+{
+	const float DistSq = RelPos2D.SquaredLength();
+	const float CombinedRadiusSq = CombinedRadius * CombinedRadius;
 
-	float DistSq = RelPos2D.SquaredLength();
-	float CombinedRadiusSq = CombinedRadius * CombinedRadius;
+	FVector2f u;
 
 	if (DistSq > CombinedRadiusSq)
 	{
-		// 没有碰撞
-		// 速度障碍的顶点
-		FVector2f VelocityObstacle[2];
+		// 未碰撞：基于 TimeHorizon 缩放
+		const float InvTimeHorizon = 1.0f / FMath::Max(Config.TimeHorizon, RVO_EPSILON);
 
-		// 计算截止圆的切线方向
-		float SqrtDistSq = FMath::Sqrt(DistSq);
-		float S = CombinedRadius / SqrtDistSq;
-		float C = FMath::Sqrt(FMath::Max(0.0f, 1.0f - S * S));
+		// w = relativeVelocity - invTimeHorizon * relativePosition
+		const FVector2f W = RelVel2D - InvTimeHorizon * RelPos2D;
+		const float WLengthSq = W.SquaredLength();
 
-		// 计算从 A 到 B 的方向
-		FVector2f Direction = RelPos2D / SqrtDistSq;
+		const float DotProduct1 = FVector2f::DotProduct(W, RelPos2D);
 
-		// 计算切线方向（使用垂直向量）
-		FVector2f Orthogonal(-Direction.Y, Direction.X);
-
-		// 两个切线点
-		VelocityObstacle[0] = Direction * S + Orthogonal * C;
-		VelocityObstacle[1] = Direction * S - Orthogonal * C;
-
-		// 计算相对速度在速度障碍上的投影
-		float DotProduct = FVector2f::DotProduct(RelVel2D, VelocityObstacle[0]);
-
-		// 选择正确的边界
-		FVector2f LeftLegDirection, RightLegDirection;
-
-		if (DotProduct < 0.0f)
+		if (DotProduct1 < 0.0f && DotProduct1 * DotProduct1 > CombinedRadiusSq * WLengthSq)
 		{
-			// 投影在左腿上
-			float LegLengthSq = VelocityObstacle[0].SquaredLength();
-			if (LegLengthSq > RVO_EPSILON)
-			{
-				LeftLegDirection = VelocityObstacle[0] / FMath::Sqrt(LegLengthSq);
-			}
-			else
-			{
-				LeftLegDirection = FVector2f(1.0f, 0.0f);
-			}
+			// 投影到 cutoff circle 上
+			const float WLength = FMath::Sqrt(WLengthSq);
+			const FVector2f UnitW = (WLength > RVO_EPSILON) ? (W / WLength) : FVector2f(1.0f, 0.0f);
 
-			// 计算右腿方向（指向 B）
-			RightLegDirection = RelPos2D.GetSafeNormal();
+			OutPlane.Direction = FVector2f(UnitW.Y, -UnitW.X);
+			u = (CombinedRadius * InvTimeHorizon - WLength) * UnitW;
 		}
 		else
 		{
-			// 投影在右腿上
-			float LegLengthSq = VelocityObstacle[1].SquaredLength();
-			if (LegLengthSq > RVO_EPSILON)
+			// 投影到 leg 上
+			const float Leg = FMath::Sqrt(FMath::Max(0.0f, DistSq - CombinedRadiusSq));
+
+			if (Det2D(RelPos2D, W) > 0.0f)
 			{
-				RightLegDirection = VelocityObstacle[1] / FMath::Sqrt(LegLengthSq);
+				// Left leg
+				OutPlane.Direction = FVector2f(
+					RelPos2D.X * Leg - RelPos2D.Y * CombinedRadius,
+					RelPos2D.X * CombinedRadius + RelPos2D.Y * Leg) / DistSq;
 			}
 			else
 			{
-				RightLegDirection = FVector2f(1.0f, 0.0f);
+				// Right leg (negated)
+				OutPlane.Direction = -FVector2f(
+					RelPos2D.X * Leg + RelPos2D.Y * CombinedRadius,
+					-RelPos2D.X * CombinedRadius + RelPos2D.Y * Leg) / DistSq;
 			}
 
-			// 计算左腿方向（指向 B）
-			LeftLegDirection = RelPos2D.GetSafeNormal();
+			u = FVector2f::DotProduct(RelVel2D, OutPlane.Direction) * OutPlane.Direction - RelVel2D;
 		}
-
-		// ORCA 平面点：相对速度的一半（互惠避障）
-		OutPlane.Point = RelVel2D * 0.5f;
-
-		// ORCA 平面方向：垂直于腿方向
-		OutPlane.Direction = FVector2f(-LeftLegDirection.Y, LeftLegDirection.X);
 	}
 	else
 	{
-		// 已经碰撞
-		// 使用简单的分离方向
-		FVector2f Direction;
-		float Dist = FMath::Sqrt(DistSq);
-		if (Dist > RVO_EPSILON)
-		{
-			Direction = RelPos2D / Dist;
-		}
-		else
-		{
-			// 完全重叠，使用随机方向
-			Direction = FVector2f(1.0f, 0.0f);
-		}
+		// 已碰撞：基于 DeltaTime 的 cutoff circle
+		const float InvTimeStep = 1.0f / FMath::Max(DeltaTime, RVO_EPSILON);
 
-		// ORCA 平面点：相对速度的一半
-		OutPlane.Point = RelVel2D * 0.5f;
+		const FVector2f W = RelVel2D - InvTimeStep * RelPos2D;
+		const float WLength = W.Size();
+		const FVector2f UnitW = (WLength > RVO_EPSILON) ? (W / WLength) : FVector2f(1.0f, 0.0f);
 
-		// ORCA 平面方向：垂直于分离方向
-		OutPlane.Direction = FVector2f(-Direction.Y, Direction.X);
+		OutPlane.Direction = FVector2f(UnitW.Y, -UnitW.X);
+		u = (CombinedRadius * InvTimeStep - WLength) * UnitW;
 	}
-}
 
-//////////////////////////////////////////////////////////////////////////
-// HRVO (Hybrid Reciprocal Velocity Obstacle)
-//////////////////////////////////////////////////////////////////////////
-
-void FSkelotRVOSystem::ComputeHRVOPlane(const FVector3f& PosA, const FVector3f& VelA,
-										  const FVector3f& PosB, const FVector3f& VelB,
-										  float CombinedRadius,
-										  FORCAPlane& OutPlane)
-{
-	// 计算相对位置和速度
-	FVector3f RelativePosition = PosB - PosA;
-	FVector3f RelativeVelocity = VelA - VelB;
-
-	// 2D 投影
-	FVector2f RelPos2D(RelativePosition.X, RelativePosition.Y);
-	FVector2f RelVel2D(RelativeVelocity.X, RelativeVelocity.Y);
-
-	// 检测是否迎面相遇
-	if (IsHeadOnCollision(RelPos2D, RelVel2D))
-	{
-		// 迎面相遇：使用 VO（一方全责）
-		// 不对速度进行分半处理，让一方完全避开
-		ComputeVOPlane(PosA, VelA, PosB, VelB, CombinedRadius, OutPlane);
-	}
-	else
-	{
-		// 非迎面相遇：使用 RVO（双方共担）
-		// 速度障碍分半，双方各避一半
-		ComputeRVOPlane(PosA, VelA, PosB, VelB, CombinedRadius, OutPlane);
-	}
+	// RVO: point = myVelocity + 0.5*u; VO: point = myVelocity + 1.0*u
+	OutPlane.Point = MyVel2D + ResponsibilityFactor * u;
 }
 
 bool FSkelotRVOSystem::IsHeadOnCollision(const FVector2f& RelativePosition, const FVector2f& RelativeVelocity) const
 {
-	// 获取向量长度
 	float RelPosLen = RelativePosition.Size();
 	float RelVelLen = RelativeVelocity.Size();
 
-	// 如果任一向量接近零，无法判断方向
 	if (RelPosLen < RVO_EPSILON || RelVelLen < RVO_EPSILON)
 	{
 		return false;
 	}
 
-	// 归一化向量
-	FVector2f RelPosNorm = RelativePosition / RelPosLen;
-	FVector2f RelVelNorm = RelativeVelocity / RelVelLen;
-
-	// 计算相对位置和相对速度的点积
-	// 相对位置指向邻居，相对速度是 A 相对于 B 的速度
-	// 如果两者方向相反（点积为负），说明 A 正在朝 B 移动
-	float DotProduct = FVector2f::DotProduct(RelPosNorm, RelVelNorm);
-
-	// 如果点积小于阈值（负值），说明是迎面相遇
-	// 阈值越小，判定越严格（-1.0 表示完全相反才判定）
+	float DotProduct = FVector2f::DotProduct(RelativePosition / RelPosLen, RelativeVelocity / RelVelLen);
 	return DotProduct < Config.HRVOHeadOnThreshold;
 }
 
-void FSkelotRVOSystem::ComputeRVOPlane(const FVector3f& PosA, const FVector3f& VelA,
-										  const FVector3f& PosB, const FVector3f& VelB,
-										  float CombinedRadius,
-										  FORCAPlane& OutPlane)
-{
-	// RVO：互惠速度障碍，双方各承担一半避障责任
-	// 这是标准的 ORCA 算法，速度障碍平分
-
-	// 计算相对位置和速度
-	FVector3f RelativePosition = PosB - PosA;
-	FVector3f RelativeVelocity = VelA - VelB;
-
-	// 2D 投影
-	FVector2f RelPos2D(RelativePosition.X, RelativePosition.Y);
-	FVector2f RelVel2D(RelativeVelocity.X, RelativeVelocity.Y);
-
-	float DistSq = RelPos2D.SquaredLength();
-	float CombinedRadiusSq = CombinedRadius * CombinedRadius;
-
-	if (DistSq > CombinedRadiusSq)
-	{
-		// 没有碰撞
-		FVector2f VelocityObstacle[2];
-
-		float SqrtDistSq = FMath::Sqrt(DistSq);
-		float S = CombinedRadius / SqrtDistSq;
-		float C = FMath::Sqrt(FMath::Max(0.0f, 1.0f - S * S));
-
-		FVector2f Direction = RelPos2D / SqrtDistSq;
-		FVector2f Orthogonal(-Direction.Y, Direction.X);
-
-		VelocityObstacle[0] = Direction * S + Orthogonal * C;
-		VelocityObstacle[1] = Direction * S - Orthogonal * C;
-
-		float DotProduct = FVector2f::DotProduct(RelVel2D, VelocityObstacle[0]);
-
-		FVector2f LeftLegDirection, RightLegDirection;
-
-		if (DotProduct < 0.0f)
-		{
-			float LegLengthSq = VelocityObstacle[0].SquaredLength();
-			LeftLegDirection = LegLengthSq > RVO_EPSILON
-				? VelocityObstacle[0] / FMath::Sqrt(LegLengthSq)
-				: FVector2f(1.0f, 0.0f);
-			RightLegDirection = RelPos2D.GetSafeNormal();
-		}
-		else
-		{
-			float LegLengthSq = VelocityObstacle[1].SquaredLength();
-			RightLegDirection = LegLengthSq > RVO_EPSILON
-				? VelocityObstacle[1] / FMath::Sqrt(LegLengthSq)
-				: FVector2f(1.0f, 0.0f);
-			LeftLegDirection = RelPos2D.GetSafeNormal();
-		}
-
-		// RVO 核心：速度障碍分半（双方各避一半）
-		OutPlane.Point = RelVel2D * 0.5f;
-		OutPlane.Direction = FVector2f(-LeftLegDirection.Y, LeftLegDirection.X);
-	}
-	else
-	{
-		// 已经碰撞
-		FVector2f Direction;
-		float Dist = FMath::Sqrt(DistSq);
-		Direction = Dist > RVO_EPSILON ? RelPos2D / Dist : FVector2f(1.0f, 0.0f);
-
-		OutPlane.Point = RelVel2D * 0.5f;
-		OutPlane.Direction = FVector2f(-Direction.Y, Direction.X);
-	}
-}
-
-void FSkelotRVOSystem::ComputeVOPlane(const FVector3f& PosA, const FVector3f& VelA,
-										  const FVector3f& PosB, const FVector3f& VelB,
-										  float CombinedRadius,
-										  FORCAPlane& OutPlane)
-{
-	// VO：标准速度障碍，一方承担全部避障责任
-	// 不对速度进行分半，让当前代理完全避开
-
-	// 计算相对位置和速度
-	FVector3f RelativePosition = PosB - PosA;
-	FVector3f RelativeVelocity = VelA - VelB;
-
-	// 2D 投影
-	FVector2f RelPos2D(RelativePosition.X, RelativePosition.Y);
-	FVector2f RelVel2D(RelativeVelocity.X, RelativeVelocity.Y);
-
-	float DistSq = RelPos2D.SquaredLength();
-	float CombinedRadiusSq = CombinedRadius * CombinedRadius;
-
-	if (DistSq > CombinedRadiusSq)
-	{
-		// 没有碰撞
-		FVector2f VelocityObstacle[2];
-
-		float SqrtDistSq = FMath::Sqrt(DistSq);
-		float S = CombinedRadius / SqrtDistSq;
-		float C = FMath::Sqrt(FMath::Max(0.0f, 1.0f - S * S));
-
-		FVector2f Direction = RelPos2D / SqrtDistSq;
-		FVector2f Orthogonal(-Direction.Y, Direction.X);
-
-		VelocityObstacle[0] = Direction * S + Orthogonal * C;
-		VelocityObstacle[1] = Direction * S - Orthogonal * C;
-
-		float DotProduct = FVector2f::DotProduct(RelVel2D, VelocityObstacle[0]);
-
-		FVector2f LeftLegDirection, RightLegDirection;
-
-		if (DotProduct < 0.0f)
-		{
-			float LegLengthSq = VelocityObstacle[0].SquaredLength();
-			LeftLegDirection = LegLengthSq > RVO_EPSILON
-				? VelocityObstacle[0] / FMath::Sqrt(LegLengthSq)
-				: FVector2f(1.0f, 0.0f);
-			RightLegDirection = RelPos2D.GetSafeNormal();
-		}
-		else
-		{
-			float LegLengthSq = VelocityObstacle[1].SquaredLength();
-			RightLegDirection = LegLengthSq > RVO_EPSILON
-				? VelocityObstacle[1] / FMath::Sqrt(LegLengthSq)
-				: FVector2f(1.0f, 0.0f);
-			LeftLegDirection = RelPos2D.GetSafeNormal();
-		}
-
-		// VO 核心：速度障碍不分半（一方全责）
-		OutPlane.Point = RelVel2D;
-		OutPlane.Direction = FVector2f(-LeftLegDirection.Y, LeftLegDirection.X);
-	}
-	else
-	{
-		// 已经碰撞
-		FVector2f Direction;
-		float Dist = FMath::Sqrt(DistSq);
-		Direction = Dist > RVO_EPSILON ? RelPos2D / Dist : FVector2f(1.0f, 0.0f);
-
-		// VO 核心：速度障碍不分半
-		OutPlane.Point = RelVel2D;
-		OutPlane.Direction = FVector2f(-Direction.Y, Direction.X);
-	}
-}
-
 //////////////////////////////////////////////////////////////////////////
-// Linear Programming
+// Linear Programming (参照 RVO2 linearProgram1/2/3)
 //////////////////////////////////////////////////////////////////////////
 
-bool FSkelotRVOSystem::LinearProgram(const TArray<FORCAPlane>& Planes,
-											  const FVector2f& PreferredVelocity,
-											  float MaxSpeed,
-											  FVector2f& OutResult)
+bool FSkelotRVOSystem::LinearProgram1(const TArray<FORCAPlane>& Planes, int32 LineNo,
+									  float Radius, const FVector2f& OptVelocity, bool bDirectionOpt,
+									  FVector2f& OutResult)
 {
-	// 如果没有约束，直接使用期望速度
-	if (Planes.Num() == 0)
-	{
-		OutResult = PreferredVelocity.GetSafeNormal() * FMath::Min(PreferredVelocity.Size(), MaxSpeed);
-		return true;
-	}
-
-	// 尝试找到满足所有约束的最优解
-	FVector2f Result = PreferredVelocity;
-	float Distance = 0.0f;
-
-	// 首先尝试 2D 线性规划
-	for (int32 i = 0; i < Planes.Num(); i++)
-	{
-		if (FVector2f::DotProduct(Planes[i].Direction, Planes[i].Point) - FVector2f::DotProduct(Planes[i].Direction, Result) < 0.0f)
-		{
-			// 违反约束 i， 需要重新计算
-			FVector2f TempResult;
-			if (LinearProgram1(Planes, i, MaxSpeed, PreferredVelocity, TempResult))
-			{
-				Result = TempResult;
-				Distance = FMath::Sqrt(Result.SquaredLength());
-			}
-			else
-			{
-				// 无法满足约束，使用 3D 投影
-				LinearProgram3(Planes, i, MaxSpeed, Result);
-				OutResult = Result;
-				return false;
-			}
-		}
-	}
-
-	OutResult = Result;
-	return true;
-}
-
-bool FSkelotRVOSystem::LinearProgram1(const TArray<FORCAPlane>& Planes, int32 PlaneNo,
-										   float Radius, const FVector2f& PreferredVelocity,
-										   FVector2f& OutResult)
-{
-	const float DotProduct = FVector2f::DotProduct(Planes[PlaneNo].Point, PreferredVelocity);
-	const float Discriminant = DotProduct * DotProduct + Radius * Radius - Planes[PlaneNo].Point.SquaredLength();
+	const float DotProduct = FVector2f::DotProduct(Planes[LineNo].Point, Planes[LineNo].Direction);
+	const float Discriminant = DotProduct * DotProduct + Radius * Radius - Planes[LineNo].Point.SquaredLength();
 
 	if (Discriminant < 0.0f)
 	{
@@ -640,71 +376,139 @@ bool FSkelotRVOSystem::LinearProgram1(const TArray<FORCAPlane>& Planes, int32 Pl
 	float tLeft = -DotProduct - SqrtDiscriminant;
 	float tRight = -DotProduct + SqrtDiscriminant;
 
-	// 检查与其他平面的交集
-	for (int32 i = 0; i < PlaneNo; i++)
+	for (int32 i = 0; i < LineNo; ++i)
 	{
-		const float DotProduct1 = FVector2f::DotProduct(Planes[PlaneNo].Direction, Planes[i].Point);
-		const float DotProduct2 = FVector2f::DotProduct(Planes[PlaneNo].Direction, Planes[i].Direction);
-		const float Numerator = DotProduct1 - DotProduct2 * tLeft;
-		const float Denominator = DotProduct2 * (tRight - tLeft);
+		const float Denominator = Det2D(Planes[LineNo].Direction, Planes[i].Direction);
+		const float Numerator = Det2D(Planes[i].Direction, Planes[LineNo].Point - Planes[i].Point);
 
-		if (Denominator >= 0.0f)
+		if (FMath::Abs(Denominator) <= RVO_EPSILON)
 		{
-			if (Numerator <= 0.0f)
+			if (Numerator < 0.0f)
 			{
 				return false;
 			}
-			else
+			continue;
+		}
+
+		const float t = Numerator / Denominator;
+
+		if (Denominator >= 0.0f)
+		{
+			tRight = FMath::Min(tRight, t);
+		}
+		else
+		{
+			tLeft = FMath::Max(tLeft, t);
+		}
+
+		if (tLeft > tRight)
+		{
+			return false;
+		}
+	}
+
+	if (bDirectionOpt)
+	{
+		if (FVector2f::DotProduct(OptVelocity, Planes[LineNo].Direction) > 0.0f)
+		{
+			OutResult = Planes[LineNo].Point + tRight * Planes[LineNo].Direction;
+		}
+		else
+		{
+			OutResult = Planes[LineNo].Point + tLeft * Planes[LineNo].Direction;
+		}
+	}
+	else
+	{
+		const float t = FVector2f::DotProduct(Planes[LineNo].Direction, OptVelocity - Planes[LineNo].Point);
+		const float tClamped = FMath::Clamp(t, tLeft, tRight);
+		OutResult = Planes[LineNo].Point + tClamped * Planes[LineNo].Direction;
+	}
+
+	return true;
+}
+
+int32 FSkelotRVOSystem::LinearProgram2(const TArray<FORCAPlane>& Planes, float Radius,
+									   const FVector2f& OptVelocity, bool bDirectionOpt,
+									   FVector2f& OutResult)
+{
+	if (bDirectionOpt)
+	{
+		OutResult = OptVelocity * Radius;
+	}
+	else if (OptVelocity.SquaredLength() > Radius * Radius)
+	{
+		OutResult = OptVelocity.GetSafeNormal() * Radius;
+	}
+	else
+	{
+		OutResult = OptVelocity;
+	}
+
+	for (int32 i = 0; i < Planes.Num(); ++i)
+	{
+		if (Det2D(Planes[i].Direction, Planes[i].Point - OutResult) > 0.0f)
+		{
+			const FVector2f TempResult = OutResult;
+
+			if (!LinearProgram1(Planes, i, Radius, OptVelocity, bDirectionOpt, OutResult))
 			{
-				const float t = Numerator / Denominator;
-				if (t > tLeft)
-				{
-					tLeft = t;
-					if (tLeft > tRight)
-					{
-						return false;
-					}
-				}
+				OutResult = TempResult;
+				return i;
 			}
 		}
 	}
 
-	OutResult = Planes[PlaneNo].Point + Planes[PlaneNo].Direction * tLeft;
-	return true;
+	return Planes.Num();
 }
 
-bool FSkelotRVOSystem::LinearProgram2(const TArray<FORCAPlane>& Planes, int32 PlaneNo,
-										   float Radius, const FVector2f& PreferredVelocity,
-										   FVector2f& OutResult)
+void FSkelotRVOSystem::LinearProgram3(const TArray<FORCAPlane>& Planes, int32 BeginLine,
+									  float Radius, FVector2f& InOutResult)
 {
-	// 实现二维约束求解（简化版本）
-	// 直接使用 LinearProgram1
-	return LinearProgram1(Planes, PlaneNo, Radius, PreferredVelocity, OutResult);
-}
-
-void FSkelotRVOSystem::LinearProgram3(const TArray<FORCAPlane>& Planes, int32 PlaneNo,
-										   float Radius, FVector2f& InOutResult)
-{
-	// 当无法找到满足所有约束的解时，投影到最近的可行解
 	float Distance = 0.0f;
 
-	for (int32 i = 0; i < PlaneNo; i++)
+	for (int32 i = BeginLine; i < Planes.Num(); ++i)
 	{
-		float PlaneDistance = FVector2f::DotProduct(Planes[i].Direction, Planes[i].Point);
-		float ResultDistance = FVector2f::DotProduct(Planes[i].Direction, InOutResult);
-
-		if (PlaneDistance > ResultDistance)
+		if (Det2D(Planes[i].Direction, Planes[i].Point - InOutResult) > Distance)
 		{
-			// 调整结果以满足约束
-			InOutResult += Planes[i].Direction * (PlaneDistance - ResultDistance);
-		}
-	}
+			// 构建投影约束集：前 i 条约束线两两交集
+			TArray<FORCAPlane> ProjLines;
+			ProjLines.Reserve(i);
 
-	// 限制在最大速度圆内
-	float ResultLength = InOutResult.Size();
-	if (ResultLength > Radius)
-	{
-		InOutResult = InOutResult.GetSafeNormal() * Radius;
+			for (int32 j = 0; j < i; ++j)
+			{
+				FORCAPlane Line;
+				const float Determinant = Det2D(Planes[i].Direction, Planes[j].Direction);
+
+				if (FMath::Abs(Determinant) <= RVO_EPSILON)
+				{
+					if (FVector2f::DotProduct(Planes[i].Direction, Planes[j].Direction) > 0.0f)
+					{
+						continue;
+					}
+					Line.Point = 0.5f * (Planes[i].Point + Planes[j].Point);
+				}
+				else
+				{
+					Line.Point = Planes[i].Point +
+						(Det2D(Planes[j].Direction, Planes[i].Point - Planes[j].Point) / Determinant) *
+						Planes[i].Direction;
+				}
+
+				Line.Direction = (Planes[j].Direction - Planes[i].Direction).GetSafeNormal();
+				ProjLines.Add(Line);
+			}
+
+			const FVector2f TempResult = InOutResult;
+
+			const FVector2f OptDirection(-Planes[i].Direction.Y, Planes[i].Direction.X);
+			if (LinearProgram2(ProjLines, Radius, OptDirection, true, InOutResult) < ProjLines.Num())
+			{
+				InOutResult = TempResult;
+			}
+
+			Distance = Det2D(Planes[i].Direction, Planes[i].Point - InOutResult);
+		}
 	}
 }
 

@@ -152,128 +152,52 @@ private:
 							   FVector3f& OutNewVelocity);
 
 	/**
-	 * 构建 ORCA 平面
+	 * 构建单对 Agent 的 ORCA 半平面（参照 RVO2 Agent::computeNewVelocity）
 	 *
-	 * @param SOA 实例数据数组
-	 * @param MyIndex 当前实例索引
-	 * @param MyPosition 当前实例位置
-	 * @param MyVelocity 当前实例速度
-	 * @param NeighborIndices 邻居索引数组
-	 * @param OutPlanes 输出 ORCA 平面数组
+	 * @param RelPos2D 相对位置 (B - A) 的 2D 投影
+	 * @param RelVel2D 相对速度 (A - B) 的 2D 投影
+	 * @param MyVel2D 当前实例的 2D 速度
+	 * @param CombinedRadius 两个代理的碰撞半径之和
+	 * @param DeltaTime 帧时间（碰撞情况使用）
+	 * @param ResponsibilityFactor 避障责任比例 (0.5 = RVO 互惠, 1.0 = VO 单方)
+	 * @param OutPlane 输出 ORCA 半平面
 	 */
-	void BuildORCAPlanes(const FSkelotInstancesSOA& SOA, int32 MyIndex,
-						 const FVector3f& MyPosition, const FVector3f& MyVelocity,
-						 const TArray<int32>& NeighborIndices,
-						 TArray<FORCAPlane>& OutPlanes);
+	void ComputeORCAPlaneInternal(const FVector2f& RelPos2D, const FVector2f& RelVel2D,
+								  const FVector2f& MyVel2D,
+								  float CombinedRadius, float DeltaTime,
+								  float ResponsibilityFactor,
+								  FORCAPlane& OutPlane);
 
 	/**
-	 * 计算两个实例之间的 ORCA 平面
-	 *
-	 * @param PosA 实例A位置
-	 * @param VelA 实例A速度
-	 * @param PosB 实例B位置
-	 * @param VelB 实例B速度
-	 * @param CombinedRadius 组合半径
-	 * @param OutPlane 输出 ORCA 平面
+	 * HRVO 路由：根据迎面检测选择 RVO(0.5) 或 VO(1.0) 责任比例
 	 */
 	void ComputeORCAPlane(const FVector3f& PosA, const FVector3f& VelA,
 						  const FVector3f& PosB, const FVector3f& VelB,
-						  float CombinedRadius,
+						  float CombinedRadius, float DeltaTime,
 						  FORCAPlane& OutPlane);
 
-	/**
-	 * 计算 HRVO 平面（混合 RVO 和 VO）
-	 *
-	 * 当两个代理迎面相遇时使用 VO，其他情况使用 RVO
-	 * 解决了 RVO 在迎面相遇时可能出现的振荡问题
-	 *
-	 * @param PosA 实例A位置
-	 * @param VelA 实例A速度
-	 * @param PosB 实例B位置
-	 * @param VelB 实例B速度
-	 * @param CombinedRadius 组合半径
-	 * @param OutPlane 输出平面
-	 */
-	void ComputeHRVOPlane(const FVector3f& PosA, const FVector3f& VelA,
-						  const FVector3f& PosB, const FVector3f& VelB,
-						  float CombinedRadius,
-						  FORCAPlane& OutPlane);
-
-	/**
-	 * 检测两个代理是否迎面相遇
-	 *
-	 * @param RelativePosition 相对位置 (B - A)
-	 * @param RelativeVelocity 相对速度 (A - B)
-	 * @return true 如果是迎面相遇
-	 */
 	bool IsHeadOnCollision(const FVector2f& RelativePosition, const FVector2f& RelativeVelocity) const;
 
 	/**
-	 * 计算 RVO 平面（互惠速度障碍）
+	 * 2D 线性规划求解（参照 RVO2 linearProgram2）
 	 *
-	 * 双方各承担一半避障责任
-	 *
-	 * @param PosA 实例A位置
-	 * @param VelA 实例A速度
-	 * @param PosB 实例B位置
-	 * @param VelB 实例B速度
-	 * @param CombinedRadius 组合半径
-	 * @param OutPlane 输出平面
+	 * @return 失败的约束行号；成功时返回 Planes.Num()
 	 */
-	void ComputeRVOPlane(const FVector3f& PosA, const FVector3f& VelA,
-						 const FVector3f& PosB, const FVector3f& VelB,
-						 float CombinedRadius,
-						 FORCAPlane& OutPlane);
+	int32 LinearProgram2(const TArray<FORCAPlane>& Planes, float Radius,
+						 const FVector2f& OptVelocity, bool bDirectionOpt,
+						 FVector2f& OutResult);
 
 	/**
-	 * 计算 VO 平面（标准速度障碍）
-	 *
-	 * 一方承担全部避障责任
-	 *
-	 * @param PosA 实例A位置
-	 * @param VelA 实例A速度
-	 * @param PosB 实例B位置
-	 * @param VelB 实例B速度
-	 * @param CombinedRadius 组合半径
-	 * @param OutPlane 输出平面
+	 * 1D 线性规划：在指定约束线上求解（参照 RVO2 linearProgram1）
 	 */
-	void ComputeVOPlane(const FVector3f& PosA, const FVector3f& VelA,
-						const FVector3f& PosB, const FVector3f& VelB,
-						float CombinedRadius,
-						FORCAPlane& OutPlane);
-
-	/**
-	 * 线性规划求解 - 找到满足所有约束的最优速度
-	 *
-	 * @param Planes ORCA 平面数组
-	 * @param PreferredVelocity 期望速度
-	 * @param MaxSpeed 最大速度
-	 * @param OutResult 输出最优速度
-	 * @return 是否找到有效解
-	 */
-	bool LinearProgram(const TArray<FORCAPlane>& Planes,
-					   const FVector2f& PreferredVelocity,
-					   float MaxSpeed,
-					   FVector2f& OutResult);
-
-	/**
-	 * 线性规划 - 单个约束求解
-	 */
-	bool LinearProgram1(const TArray<FORCAPlane>& Planes, int32 PlaneNo,
-						float Radius, const FVector2f& PreferredVelocity,
+	bool LinearProgram1(const TArray<FORCAPlane>& Planes, int32 LineNo,
+						float Radius, const FVector2f& OptVelocity, bool bDirectionOpt,
 						FVector2f& OutResult);
 
 	/**
-	 * 线性规划 - 二维约束求解
+	 * LP 回退求解：当 LP2 失败时寻找"最不违反"的可行解（参照 RVO2 linearProgram3）
 	 */
-	bool LinearProgram2(const TArray<FORCAPlane>& Planes, int32 PlaneNo,
-						float Radius, const FVector2f& PreferredVelocity,
-						FVector2f& OutResult);
-
-	/**
-	 * 线性规划 - 三维投影求解（当二维无解时）
-	 */
-	void LinearProgram3(const TArray<FORCAPlane>& Planes, int32 PlaneNo,
+	void LinearProgram3(const TArray<FORCAPlane>& Planes, int32 BeginLine,
 						float Radius, FVector2f& InOutResult);
 
 	/**

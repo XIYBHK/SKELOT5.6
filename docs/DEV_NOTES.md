@@ -813,4 +813,46 @@ void ComputeHRVOPlane(...)
 - 分帧更新中 `if (counter == 0)` 检查必须在递增**之前**
 - 所有 Actor 必须在 `EndPlay` 中清理创建的 Skelot 实例
 
+---
+
+## ORCA 求解器重写 - 参照 RVO2 修正核心算法 (2026-03-06)
+
+对照 RVO2 库（github.com/snape/RVO2）的 `Agent.cc`，重写了 ORCA 半平面构建和线性规划求解器。
+
+### 修正内容
+
+1. **ComputeORCAPlane → ComputeORCAPlaneInternal**
+   - 引入 `invTimeHorizon = 1/TimeHorizon` 缩放相对位置，构建正确的 cutoff circle
+   - 计算 `w = relVel - invTimeHorizon * relPos`（从 cutoff center 到相对速度的向量）
+   - 计算 `u` 修正向量（从 VO 边界最近点到当前相对速度）
+   - `Point = myVelocity + ResponsibilityFactor * u`（RVO: 0.5, VO: 1.0）
+   - 碰撞情况使用 `1/DeltaTime` 而非 `1/TimeHorizon`
+   - Leg 方向使用精确的 `sqrt(distSq - combinedRadiusSq)` 公式
+
+2. **LinearProgram2（原 LinearProgram）**
+   - 约束违反检查从 `DotProduct` 改为 `Det2D`（2D 行列式）
+   - 返回值从 `bool` 改为 `int32`（失败行号）
+   - 初始 result 正确处理速度圆约束
+
+3. **LinearProgram1**
+   - 交集计算从 `DotProduct` 改为 `Det2D`
+   - 正确的平行线处理（`|det| <= epsilon` 分支）
+   - tLeft/tRight 双向更新（原代码只更新 tLeft）
+   - 最优点选择：`t = dot(dir, optVel - point); clamp(t, tLeft, tRight)`
+
+4. **LinearProgram3**
+   - 从简单逐个投影改为构建投影约束集 + 调用 LP2 求解
+   - 对每个违反的约束，计算与所有前序约束的交集线
+   - 确保全局可行性
+
+5. **统一 RVO/VO/HRVO**
+   - 三个独立函数合并为 `ComputeORCAPlaneInternal` + 责任系数参数
+   - HRVO 通过 `IsHeadOnCollision` 选择系数 0.5 或 1.0
+
+### 关键数学
+
+- `Det2D(A, B) = A.X*B.Y - A.Y*B.X`（2D 行列式/叉积）
+- 约束违反判定：`Det2D(direction, point - result) > 0` 表示 result 在约束允许区域外
+- LP1 交集：`denominator = Det2D(lineNo.dir, i.dir); numerator = Det2D(i.dir, lineNo.point - i.point)`
+
 *最后更新: 2026-03-06*
