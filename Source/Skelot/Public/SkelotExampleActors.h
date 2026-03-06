@@ -306,6 +306,10 @@ private:
 
 	/** 应用PBD/RVO配置 */
 	void ApplyConfigs();
+
+	/** 复用的速度批处理缓冲，避免每帧重复分配 */
+	TArray<int32> VelocityBatchIndices;
+	TArray<FVector3f> VelocityBatchValues;
 };
 
 
@@ -676,6 +680,10 @@ private:
 
 	/** 当前方向数组 */
 	TArray<FVector> TargetDirections;
+
+	/** 复用的速度批处理缓冲，避免每帧重复分配 */
+	TArray<int32> VelocityBatchIndices;
+	TArray<FVector3f> VelocityBatchValues;
 
 	/** 处理键盘输入 */
 	void HandleKeyboardInput();

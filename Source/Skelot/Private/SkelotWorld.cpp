@@ -1279,6 +1279,54 @@ void ASkelotWorld::SetInstanceVelocities(const TArray<FSkelotInstanceHandle>& Ha
 	}
 }
 
+void ASkelotWorld::AdvanceInstancesByVelocity(const TArray<int32>& InstanceIndices, const TArray<FVector3f>& DesiredVelocities, float DeltaTime, bool bPreferCurrentVelocityForMovement, bool bRotateToMovement /*= true*/)
+{
+	if (InstanceIndices.Num() != DesiredVelocities.Num())
+	{
+		UE_LOG(LogSkelot, Warning, TEXT("AdvanceInstancesByVelocity: size mismatch (%d vs %d)"), InstanceIndices.Num(), DesiredVelocities.Num());
+		return;
+	}
+
+	if (DeltaTime <= 0.0f)
+	{
+		SetInstanceVelocities(InstanceIndices, DesiredVelocities);
+		return;
+	}
+
+	for (int32 i = 0; i < InstanceIndices.Num(); i++)
+	{
+		const int32 InstanceIndex = InstanceIndices[i];
+		if (!IsInstanceAlive(InstanceIndex))
+		{
+			continue;
+		}
+
+		const FVector3f DesiredVelocity = DesiredVelocities[i];
+		FVector3f AppliedVelocity = DesiredVelocity;
+		if (bPreferCurrentVelocityForMovement)
+		{
+			AppliedVelocity = SOA.Velocities[InstanceIndex];
+			if (AppliedVelocity.IsNearlyZero())
+			{
+				AppliedVelocity = DesiredVelocity;
+			}
+		}
+
+		SOA.Velocities[InstanceIndex] = DesiredVelocity;
+		SOA.Locations[InstanceIndex] += FVector(AppliedVelocity) * DeltaTime;
+
+		if (bRotateToMovement)
+		{
+			const FVector FacingDirection = FVector(AppliedVelocity).GetSafeNormal();
+			if (!FacingDirection.IsNearlyZero())
+			{
+				const FQuat TargetRotation = FRotationMatrix::MakeFromX(FacingDirection).ToQuat();
+				SOA.Rotations[InstanceIndex] = FQuat4f(TargetRotation);
+			}
+		}
+	}
+}
+
 //////////////////////////////////////////////////////////////////////////
 // Collision Channel API
 
@@ -2021,20 +2069,36 @@ void ASkelotWorld::ForEachChild(FSkelotAttachParentData& Root, ChildVisitFunc Fu
 	if (!IsInstanceAlive(Root.InstanceIndex))
 		return;
 
-	int32 ChildIdx = Root.FirstChild;
-	int32 RemainingChildren = SOA.Slots.Num();
-	while (ChildIdx != -1 && RemainingChildren-- > 0)
+	TArray<TPair<int32, int32>, TInlineAllocator<32>> Stack;
+	if (Root.FirstChild != -1)
 	{
-		if (!IsInstanceAlive(ChildIdx))
-			break;
+		Stack.Emplace(Root.InstanceIndex, Root.FirstChild);
+	}
 
+	int32 RemainingChildren = SOA.Slots.Num();
+	while (Stack.Num() > 0 && RemainingChildren-- > 0)
+	{
+		const TPair<int32, int32> Link = Stack.Pop(EAllowShrinking::No);
+		const int32 ParentIdx = Link.Key;
+		const int32 ChildIdx = Link.Value;
+		if (!IsInstanceAlive(ParentIdx) || !IsInstanceAlive(ChildIdx))
+			continue;
+
+		FSkelotAttachParentData* ParentFrag = GetInstanceAttachParentData(ParentIdx);
 		FSkelotAttachParentData* ChildFrag = GetInstanceAttachParentData(ChildIdx);
-		if (!ChildFrag || ChildFrag->InstanceIndex != ChildIdx)
-			break;
+		if (!ParentFrag || !ChildFrag || ParentFrag->InstanceIndex != ParentIdx || ChildFrag->InstanceIndex != ChildIdx)
+			continue;
 
-		Func(Root, *ChildFrag);
-		ForEachChild(*ChildFrag, Func);
-		ChildIdx = ChildFrag->Down;
+		Func(*ParentFrag, *ChildFrag);
+
+		if (ChildFrag->Down != -1)
+		{
+			Stack.Emplace(ParentIdx, ChildFrag->Down);
+		}
+		if (ChildFrag->FirstChild != -1)
+		{
+			Stack.Emplace(ChildIdx, ChildFrag->FirstChild);
+		}
 	}
 }
 
@@ -2220,10 +2284,10 @@ void ASkelotWorld::QueryLocationOverlappingSphere(const FVector& Center, float R
 	// 使用空间网格优化查询
 	if (bEnableSpatialGrid && SpatialGrid.GetNumCells() > 0)
 	{
-		TArray<int32> Indices;
-		SpatialGrid.QuerySphere(Center, Radius, Indices, 0xFF, &SOA);
-		Instances.Reserve(Instances.Num() + Indices.Num());
-		for (int32 Idx : Indices)
+		SpatialQueryScratchIndices.Reset();
+		SpatialGrid.QuerySphere(Center, Radius, SpatialQueryScratchIndices, 0xFF, &SOA);
+		Instances.Reserve(Instances.Num() + SpatialQueryScratchIndices.Num());
+		for (int32 Idx : SpatialQueryScratchIndices)
 		{
 			Instances.Add(IndexToHandle(Idx));
 		}
@@ -2252,10 +2316,10 @@ void ASkelotWorld::QueryLocationOverlappingSphereWithMask(const FVector& Center,
 	// 使用空间网格优化查询
 	if (bEnableSpatialGrid && SpatialGrid.GetNumCells() > 0)
 	{
-		TArray<int32> Indices;
-		SpatialGrid.QuerySphere(Center, Radius, Indices, CollisionMask, &SOA);
-		OutInstances.Reserve(OutInstances.Num() + Indices.Num());
-		for (int32 Idx : Indices)
+		SpatialQueryScratchIndices.Reset();
+		SpatialGrid.QuerySphere(Center, Radius, SpatialQueryScratchIndices, CollisionMask, &SOA);
+		OutInstances.Reserve(OutInstances.Num() + SpatialQueryScratchIndices.Num());
+		for (int32 Idx : SpatialQueryScratchIndices)
 		{
 			OutInstances.Add(IndexToHandle(Idx));
 		}
@@ -2299,10 +2363,10 @@ void ASkelotWorld::QueryLocationOverlappingBoxWithMask(const FVector& BoxCenter,
 	// 使用空间网格优化查询
 	if (bEnableSpatialGrid && SpatialGrid.GetNumCells() > 0)
 	{
-		TArray<int32> Indices;
-		SpatialGrid.QueryBox(BoxCenter, BoxExtent, Indices, CollisionMask, &SOA);
-		OutInstances.Reserve(OutInstances.Num() + Indices.Num());
-		for (int32 Idx : Indices)
+		SpatialQueryScratchIndices.Reset();
+		SpatialGrid.QueryBox(BoxCenter, BoxExtent, SpatialQueryScratchIndices, CollisionMask, &SOA);
+		OutInstances.Reserve(OutInstances.Num() + SpatialQueryScratchIndices.Num());
+		for (int32 Idx : SpatialQueryScratchIndices)
 		{
 			OutInstances.Add(IndexToHandle(Idx));
 		}
@@ -2369,6 +2433,44 @@ void ASkelotWorld::RebuildSpatialGrid()
 	}
 }
 
+const FSkelotSpatialGrid& ASkelotWorld::GetNeighborQuerySpatialGrid() const
+{
+	if (bEnableSpatialGrid)
+	{
+		return SpatialGrid;
+	}
+
+	float DesiredCellSize = TNumericLimits<float>::Max();
+	if (PBDConfig.bEnablePBD)
+	{
+		const float PBDCellSize = FMath::Max(PBDConfig.CollisionRadius * 2.0f * PBDConfig.GridCellSizeMultiplier, 1.0f);
+		DesiredCellSize = FMath::Min(DesiredCellSize, PBDCellSize);
+	}
+	if (RVOConfig.bEnableRVO)
+	{
+		const float RVOCellSize = FMath::Max(RVOConfig.NeighborRadius, 1.0f);
+		DesiredCellSize = FMath::Min(DesiredCellSize, RVOCellSize);
+	}
+	if (!FMath::IsFinite(DesiredCellSize) || DesiredCellSize == TNumericLimits<float>::Max())
+	{
+		DesiredCellSize = FMath::Max(SpatialGrid.GetCellSize(), 1.0f);
+	}
+
+	if (!FMath::IsNearlyEqual(FallbackSpatialGrid.GetCellSize(), DesiredCellSize))
+	{
+		FallbackSpatialGrid.SetCellSize(DesiredCellSize);
+	}
+
+	const uint64 CurrentFrame = GFrameCounter;
+	if (FallbackSpatialGridFrame != CurrentFrame || FallbackSpatialGrid.GetNumCells() == 0)
+	{
+		FallbackSpatialGrid.Rebuild(SOA, GetNumInstance());
+		FallbackSpatialGridFrame = CurrentFrame;
+	}
+
+	return FallbackSpatialGrid;
+}
+
 //////////////////////////////////////////////////////////////////////////
 // PBD Collision API Implementation
 
@@ -2420,18 +2522,10 @@ void ASkelotWorld::SolvePBDCollisions(float DeltaTime)
 	}
 	PBDUpdateFrameCounter = 0;
 
-	const FSkelotSpatialGrid* ActiveSpatialGrid = &SpatialGrid;
-	FSkelotSpatialGrid FallbackSpatialGrid;
-	if (!bEnableSpatialGrid)
-	{
-		const float FallbackCellSize = FMath::Max(PBDConfig.CollisionRadius * 2.0f * PBDConfig.GridCellSizeMultiplier, 1.0f);
-		FallbackSpatialGrid.SetCellSize(FallbackCellSize);
-		FallbackSpatialGrid.Rebuild(SOA, GetNumInstance());
-		ActiveSpatialGrid = &FallbackSpatialGrid;
-	}
+	const FSkelotSpatialGrid& ActiveSpatialGrid = GetNeighborQuerySpatialGrid();
 
 	// 执行PBD碰撞求解（实例间碰撞）
-	PBDCollisionSystem.SolveCollisions(SOA, GetNumInstance(), *ActiveSpatialGrid, DeltaTime);
+	PBDCollisionSystem.SolveCollisions(SOA, GetNumInstance(), ActiveSpatialGrid, DeltaTime);
 
 	// 执行障碍物碰撞求解
 	if (RegisteredObstacles.Num() > 0)
@@ -2472,18 +2566,10 @@ void ASkelotWorld::ComputeRVOAvoidance(float DeltaTime)
 		return;
 	}
 
-	const FSkelotSpatialGrid* ActiveSpatialGrid = &SpatialGrid;
-	FSkelotSpatialGrid FallbackSpatialGrid;
-	if (!bEnableSpatialGrid)
-	{
-		const float FallbackCellSize = FMath::Max(RVOConfig.NeighborRadius, PBDConfig.CollisionRadius * 2.0f);
-		FallbackSpatialGrid.SetCellSize(FallbackCellSize);
-		FallbackSpatialGrid.Rebuild(SOA, GetNumInstance());
-		ActiveSpatialGrid = &FallbackSpatialGrid;
-	}
+	const FSkelotSpatialGrid& ActiveSpatialGrid = GetNeighborQuerySpatialGrid();
 
 	// 执行 RVO 避障计算
-	RVOSystem.ComputeAvoidance(SOA, GetNumInstance(), *ActiveSpatialGrid, DeltaTime, PBDConfig.CollisionRadius);
+	RVOSystem.ComputeAvoidance(SOA, GetNumInstance(), ActiveSpatialGrid, DeltaTime, PBDConfig.CollisionRadius);
 }
 
 //////////////////////////////////////////////////////////////////////////

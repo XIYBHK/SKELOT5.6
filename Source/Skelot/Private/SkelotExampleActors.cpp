@@ -471,6 +471,9 @@ void ASkelotExampleCollisionAvoidance::UpdateInstanceMovement(float DeltaTime)
 
 	ArrivedCount = 0;
 	const float ArrivalThreshold = 50.0f;
+	const bool bUseAvoidanceVelocity = bEnablePBD || bEnableRVO;
+	VelocityBatchIndices.Reset(InstanceDataArray.Num());
+	VelocityBatchValues.Reset(InstanceDataArray.Num());
 
 	for (FInstanceData& Data : InstanceDataArray)
 	{
@@ -511,7 +514,8 @@ void ASkelotExampleCollisionAvoidance::UpdateInstanceMovement(float DeltaTime)
 			}
 
 			// 停止移动
-			SkelotWorld->SetInstanceVelocity(Data.Handle.InstanceIndex, FVector3f::ZeroVector);
+			VelocityBatchIndices.Add(Data.Handle.InstanceIndex);
+			VelocityBatchValues.Add(FVector3f::ZeroVector);
 
 			// 播放待机动画
 			if (IdleAnimation && !Data.bIsIdleAnimationPlaying)
@@ -538,28 +542,9 @@ void ASkelotExampleCollisionAvoidance::UpdateInstanceMovement(float DeltaTime)
 				// 计算移动方向和速度
 				FVector Direction = ToTarget.GetSafeNormal();
 				const FVector3f DesiredVelocity = FVector3f(Direction * MoveSpeed);
-				const FVector3f CurrentVelocity = SkelotWorld->GetInstanceVelocity(Data.Handle);
 
-				SkelotWorld->SetInstanceVelocity(Data.Handle.InstanceIndex, DesiredVelocity);
-
-				// 未启用避障时按目标速度前进；启用后使用上一帧已调整的速度，避免覆盖避障结果
-				FVector AppliedVelocity = FVector(DesiredVelocity);
-				if (bEnablePBD || bEnableRVO)
-				{
-					AppliedVelocity = FVector(CurrentVelocity);
-					if (AppliedVelocity.IsNearlyZero())
-					{
-						AppliedVelocity = FVector(DesiredVelocity);
-					}
-				}
-
-				FVector NewLoc = CurrentLoc + AppliedVelocity * DeltaTime;
-				SkelotWorld->SetInstanceLocation(Data.Handle.InstanceIndex, NewLoc);
-
-				// 朝向目标
-				const FVector FacingDirection = AppliedVelocity.IsNearlyZero() ? Direction : AppliedVelocity.GetSafeNormal();
-				FQuat TargetRotation = FRotationMatrix::MakeFromX(FacingDirection).Rotator().Quaternion();
-				SkelotWorld->SetInstanceRotation(Data.Handle.InstanceIndex, FQuat4f(TargetRotation));
+				VelocityBatchIndices.Add(Data.Handle.InstanceIndex);
+				VelocityBatchValues.Add(DesiredVelocity);
 
 				// 播放行走动画
 				if (WalkAnimation && !Data.bIsWalkAnimationPlaying)
@@ -574,6 +559,11 @@ void ASkelotExampleCollisionAvoidance::UpdateInstanceMovement(float DeltaTime)
 				}
 			}
 		}
+	}
+
+	if (VelocityBatchIndices.Num() > 0 && VelocityBatchIndices.Num() == VelocityBatchValues.Num())
+	{
+		SkelotWorld->AdvanceInstancesByVelocity(VelocityBatchIndices, VelocityBatchValues, DeltaTime, bUseAvoidanceVelocity, true);
 	}
 }
 
@@ -1203,10 +1193,8 @@ void ASkelotExampleStressTest::UpdateInstanceMovement(float DeltaTime)
 		DirectionChangeTimer = 0.0f;
 	}
 
-	TArray<int32> Indices;
-	TArray<FVector3f> Velocities;
-	Indices.Reserve(InstanceHandles.Num());
-	Velocities.Reserve(InstanceHandles.Num());
+	VelocityBatchIndices.Reset(InstanceHandles.Num());
+	VelocityBatchValues.Reset(InstanceHandles.Num());
 
 	for (int32 i = 0; i < InstanceHandles.Num(); ++i)
 	{
@@ -1239,35 +1227,13 @@ void ASkelotExampleStressTest::UpdateInstanceMovement(float DeltaTime)
 
 		// 设置速度
 		const FVector3f DesiredVelocity = FVector3f(MoveDir * MoveSpeed);
-		const FVector3f CurrentVelocity = SkelotWorld->GetInstanceVelocity(Handle);
-		Indices.Add(Handle.InstanceIndex);
-		Velocities.Add(DesiredVelocity);
-
-		FVector AppliedVelocity = FVector(DesiredVelocity);
-		if (TestMode >= 2)
-		{
-			AppliedVelocity = FVector(CurrentVelocity);
-			if (AppliedVelocity.IsNearlyZero())
-			{
-				AppliedVelocity = FVector(DesiredVelocity);
-			}
-		}
-
-		FVector NewLoc = CurrentLoc + AppliedVelocity * DeltaTime;
-		SkelotWorld->SetInstanceLocation(Handle.InstanceIndex, NewLoc);
-
-		// 朝向移动方向
-		const FVector FacingDirection = AppliedVelocity.IsNearlyZero() ? MoveDir : AppliedVelocity.GetSafeNormal();
-		if (!FacingDirection.IsNearlyZero())
-		{
-			FQuat TargetRotation = FRotationMatrix::MakeFromX(FacingDirection).Rotator().Quaternion();
-			SkelotWorld->SetInstanceRotation(Handle.InstanceIndex, FQuat4f(TargetRotation));
-		}
+		VelocityBatchIndices.Add(Handle.InstanceIndex);
+		VelocityBatchValues.Add(DesiredVelocity);
 	}
 
-	if (Indices.Num() > 0 && Velocities.Num() == Indices.Num())
+	if (VelocityBatchIndices.Num() > 0 && VelocityBatchValues.Num() == VelocityBatchIndices.Num())
 	{
-		SkelotWorld->SetInstanceVelocities(Indices, Velocities);
+		SkelotWorld->AdvanceInstancesByVelocity(VelocityBatchIndices, VelocityBatchValues, DeltaTime, TestMode >= 2, true);
 	}
 }
 

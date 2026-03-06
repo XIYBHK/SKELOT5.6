@@ -87,6 +87,15 @@ public:
 	// 空间网格实例
 	mutable FSkelotSpatialGrid SpatialGrid;
 
+	// 关闭空间网格开关时的共享回退网格，供 PBD/RVO 在同帧复用
+	mutable FSkelotSpatialGrid FallbackSpatialGrid;
+
+	// 记录回退网格上次构建的帧，避免同帧重复整表重建
+	mutable uint64 FallbackSpatialGridFrame = MAX_uint64;
+
+	// 复用的空间查询索引缓冲，减少 QuerySphere/QueryBox 的局部分配
+	mutable TArray<int32> SpatialQueryScratchIndices;
+
 	// 是否启用空间网格优化
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skelot|空间查询", meta = (DisplayName = "启用空间网格"))
 	bool bEnableSpatialGrid = true;
@@ -340,6 +349,8 @@ public:
 	void SetInstanceVelocities(const TArray<int32>& InstanceIndices, const TArray<FVector3f>& Velocities);
 	//batch set velocities using handles
 	void SetInstanceVelocities(const TArray<FSkelotInstanceHandle>& Handles, const TArray<FVector3f>& Velocities);
+	//batch integrate locations/rotations from desired velocities; optionally prefer existing adjusted velocity for movement
+	void AdvanceInstancesByVelocity(const TArray<int32>& InstanceIndices, const TArray<FVector3f>& DesiredVelocities, float DeltaTime, bool bPreferCurrentVelocityForMovement, bool bRotateToMovement = true);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Collision Channel API - for PBD collision and RVO avoidance systems
@@ -561,6 +572,9 @@ public:
 	 * 重建空间网格（内部使用，每帧自动调用）
 	 */
 	void RebuildSpatialGrid();
+
+	// 选择邻居查询使用的空间网格；关闭主网格时会按帧构建共享回退网格
+	const FSkelotSpatialGrid& GetNeighborQuerySpatialGrid() const;
 
 	//////////////////////////////////////////////////////////////////////////
 	// PBD Collision API
