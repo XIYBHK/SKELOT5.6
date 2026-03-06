@@ -157,9 +157,6 @@ private:
 	/** PBD配置 */
 	FSkelotPBDConfig Config;
 
-	/** 临时数组：邻居索引 */
-	TArray<int32> NeighborIndices;
-
 	/** 临时数组：位置校正量 */
 	TArray<FVector3f> PositionCorrections;
 

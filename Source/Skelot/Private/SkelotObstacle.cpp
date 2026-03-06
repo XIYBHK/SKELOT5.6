@@ -238,7 +238,6 @@ float ASkelotBoxObstacle::GetObstacleRadius_Implementation() const
 
 FVector ASkelotBoxObstacle::WorldToLocal(const FVector& WorldPoint) const
 {
-	FVector Relative = WorldPoint - GetActorLocation();
 	return GetActorTransform().InverseTransformPosition(WorldPoint);
 }
 
@@ -271,13 +270,28 @@ float ASkelotBoxObstacle::GetDistanceToPoint_Implementation(const FVector& Point
 	FVector LocalPoint = WorldToLocal(Point);
 	FVector EffectiveExtent = BoxExtent + FVector(RadiusOffset);
 
-	// 计算本地空间中的最近点
+	// 计算本地空间中最近的表面点
 	FVector LocalClosest = ClosestPointOnAABB(LocalPoint, -EffectiveExtent, EffectiveExtent);
 	OutClosestPoint = LocalToWorld(LocalClosest);
 
-	// 计算距离
 	FVector Delta = LocalPoint - LocalClosest;
-	return Delta.Size();
+	float Dist = Delta.Size();
+
+	// 点在盒子内部时返回负距离
+	if (Dist < KINDA_SMALL_NUMBER && IsPointInside(Point))
+	{
+		// 计算到最近表面的距离（各轴取最小穿透深度）
+		float MinPenetration = FLT_MAX;
+		for (int32 Axis = 0; Axis < 3; ++Axis)
+		{
+			float PenPos = EffectiveExtent[Axis] - LocalPoint[Axis];
+			float PenNeg = EffectiveExtent[Axis] + LocalPoint[Axis];
+			MinPenetration = FMath::Min(MinPenetration, FMath::Min(PenPos, PenNeg));
+		}
+		return -MinPenetration;
+	}
+
+	return Dist;
 }
 
 bool ASkelotBoxObstacle::ComputeCollisionResponse_Implementation(const FVector& InstanceLocation, float InstanceRadius,

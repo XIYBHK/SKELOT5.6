@@ -153,8 +153,6 @@ private:
 	/** 总实例数（统计用） */
 	int32 TotalInstances;
 
-	/** 临时数组（用于查询，避免重复分配） */
-	mutable TArray<int32> TempCellInstances;
 };
 
 /**

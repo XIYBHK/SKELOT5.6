@@ -32,6 +32,7 @@ class SKELOT_API ASkelotExampleBasicInstance : public AActor
 
 public:
 	ASkelotExampleBasicInstance();
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	/** 渲染参数资产 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "配置", meta = (DisplayName = "渲染参数"))
@@ -166,6 +167,7 @@ class SKELOT_API ASkelotExampleCollisionAvoidance : public AActor
 
 public:
 	ASkelotExampleCollisionAvoidance();
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	/** 渲染参数资产 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "配置", meta = (DisplayName = "渲染参数"))
@@ -300,9 +302,6 @@ private:
 	/** 更新实例移动 */
 	void UpdateInstanceMovement(float DeltaTime);
 
-	/** 更新实例速度 */
-	void UpdateInstanceVelocities();
-
 	/** 应用PBD/RVO配置 */
 	void ApplyConfigs();
 };
@@ -329,6 +328,7 @@ class SKELOT_API ASkelotExampleGeometryTools : public AActor
 
 public:
 	ASkelotExampleGeometryTools();
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	/** 渲染参数资产 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "配置", meta = (DisplayName = "渲染参数"))
@@ -462,6 +462,7 @@ class SKELOT_API ASkelotExampleStressTest : public AActor
 
 public:
 	ASkelotExampleStressTest();
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	/** 渲染参数资产 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "配置", meta = (DisplayName = "渲染参数"))

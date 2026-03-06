@@ -750,4 +750,67 @@ void ComputeHRVOPlane(...)
 
 ---
 
-*最后更新: 2026-03-02*
+---
+
+## 全面代码审查发现的问题与修复 (2026-03-06)
+
+对全部提交历史进行代码审查，发现并修复 15 个问题。
+
+### Critical 修复
+
+1. **PBD 零距离方向向量未归一化** (`SkelotPBDCollision.cpp`)
+   - **问题**: 两实例完全重叠时，`Delta=(1,0,0)` 但 `Dist=KINDA_SMALL_NUMBER(~0.0001)`，导致 `Direction = Delta/Dist` 放大约 10000 倍，实例瞬间飞出
+   - **修复**: `Dist = 1.0f` 与 Delta 长度匹配
+
+2. **PBD QuerySphere 缺少 SOA 参数** (`SkelotPBDCollision.cpp`)
+   - **问题**: `SpatialGrid.QuerySphere()` 不传 SOA，距离精细过滤失效（所有实例位置回退为原点）
+   - **修复**: 传入 `&SOA` 参数
+
+### High 修复
+
+3. **SpatialGrid RebuildIncremental 首帧跳过** (`SkelotSpatialGrid.cpp`)
+   - **问题**: 先递增 `CurrentFrameIndex` 再检查是否为 0，首次调用必然跳过重建
+   - **修复**: 检查放在递增之前
+
+4. **SpatialGrid TempCellInstances 死代码** (`SkelotSpatialGrid.h`)
+   - **问题**: `mutable TArray<int32>` 成员从未使用，是 ParallelFor 下的线程安全隐患
+   - **修复**: 删除
+
+5. **球面/胶囊面 Radius=0 除零** (`SkelotGeometryTools.cpp`)
+   - **问题**: 半径为 0 时 `CeilToInt(0)=0`，后续 `i/NumTheta` 除零
+   - **修复**: 半径 < KINDA_SMALL_NUMBER 时提前返回中心点，并对 NumTheta/NumPhi 使用 `Max(1,...)`
+
+6. **AverageFPS=0 除零** (`SkelotExampleActors.cpp`)
+   - **修复**: `AverageFrameTimeMs = (AverageFPS > 0) ? 1000/AverageFPS : 0`
+
+7. **4 个示例 Actor 缺少 EndPlay** (`SkelotExampleActors.cpp/.h`)
+   - **问题**: Actor 销毁时不清理 Skelot 实例，导致资源泄漏
+   - **修复**: 为 BasicInstance、CollisionAvoidance、GeometryTools、StressTest 添加 EndPlay override
+
+### Medium 修复
+
+8. **OuUserData 拼写** (`SkelotSubsystem.h`) → `OutUserData`
+9. **CreateAllSkelotAssets AnimCollection 回退** (`SkelotAssetTypeActions.cpp`) — 删除失败时尝试加载已有资产
+10. **PBD NeighborIndices 死代码** (`SkelotPBDCollision.h/.cpp`) — 删除未使用的成员和 Reserve
+11. **BoxObstacle GetDistanceToPoint 内部点返回 0** (`SkelotObstacle.cpp`) — 改为返回负距离（最小穿透深度）
+12. **RVO TotalVelocityAdjustments 初始化为 1** (`SkelotRVOSystem.cpp`) → 初始化为 0
+13. **BoxObstacle WorldToLocal 死代码** (`SkelotObstacle.cpp`) — 删除未使用的 Relative 变量
+
+### Low 修复
+
+14. **BezierSampleCount=1 除零** (`SkelotExampleActors.cpp`) — 保护 `n-1` 分母
+15. **GetPointsBySpline CountY=1 偏移** (`SkelotGeometryTools.cpp`) — CountY=1 时居中
+16. **CollisionAvoidance UpdateInstanceVelocities 声明无实现** (`SkelotExampleActors.h`) — 删除死声明
+
+### 已知但未修复的问题（需要大规模重构）
+
+- **ORCA 线性规划求解器算法偏差**: `LinearProgram1` 使用 DotProduct 而非 2D 行列式(det)，半平面 Point 计算过于简化，TimeHorizon 未参与 VO 缩放。需要参照 RVO2 库重写整个求解器，属于独立重构任务。
+
+### 关键规则
+
+- `Direction = Delta / Dist`：**必须确保 Dist 与 Delta.Size() 一致**，否则方向向量不是单位向量
+- `SpatialGrid.QuerySphere()` 做精确距离过滤时**必须传入 SOA**
+- 分帧更新中 `if (counter == 0)` 检查必须在递增**之前**
+- 所有 Actor 必须在 `EndPlay` 中清理创建的 Skelot 实例
+
+*最后更新: 2026-03-06*

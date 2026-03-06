@@ -11,7 +11,6 @@ FSkelotPBDCollisionSystem::FSkelotPBDCollisionSystem()
 	, ProcessedCollisionPairs(0)
 	, TotalCorrection(0.0f)
 {
-	NeighborIndices.Reserve(128);
 	PositionCorrections.Reserve(128);
 }
 
@@ -70,9 +69,9 @@ bool FSkelotPBDCollisionSystem::SolveCollisionPair(const FSkelotInstancesSOA& SO
 	float Dist = FMath::Sqrt(DistSq);
 	if (Dist < KINDA_SMALL_NUMBER)
 	{
-		// 距离为零，使用随机方向分离
+		// 距离为零，使用固定方向分离；Dist 必须与 Delta 长度匹配，否则 Direction = Delta/Dist 不是单位向量
 		Delta = FVector3f(1.0f, 0.0f, 0.0f);
-		Dist = KINDA_SMALL_NUMBER;
+		Dist = 1.0f;
 	}
 
 	// 计算穿透深度
@@ -182,7 +181,7 @@ void FSkelotPBDCollisionSystem::SolveIteration(FSkelotInstancesSOA& SOA, int32 N
 		// 使用空间网格查询邻居（线程局部缓存）
 		TArray<int32> LocalNeighborIndices;
 		LocalNeighborIndices.Reset();
-		SpatialGrid.QuerySphere(FVector(MyPos), Config.CollisionRadius * 2.0f, LocalNeighborIndices);
+		SpatialGrid.QuerySphere(FVector(MyPos), Config.CollisionRadius * 2.0f, LocalNeighborIndices, 0xFF, &SOA);
 
 		// 限制邻居数量
 		int32 NumNeighbors = FMath::Min(LocalNeighborIndices.Num(), Config.MaxNeighbors);

@@ -33,6 +33,12 @@ void ASkelotExampleBasicInstance::BeginPlay()
 	}
 }
 
+void ASkelotExampleBasicInstance::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	DestroyAllInstances();
+	Super::EndPlay(EndPlayReason);
+}
+
 void ASkelotExampleBasicInstance::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -251,6 +257,21 @@ void ASkelotExampleCollisionAvoidance::BeginPlay()
 		ApplyConfigs();
 		InitializeInstances();
 	}
+}
+
+void ASkelotExampleCollisionAvoidance::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (SkelotWorld)
+	{
+		TArray<FSkelotInstanceHandle> HandlesToDestroy;
+		for (const FInstanceData& Data : InstanceDataArray)
+		{
+			HandlesToDestroy.Add(Data.Handle);
+		}
+		USkelotWorldSubsystem::Skelot_DestroyInstances(this, HandlesToDestroy);
+	}
+	InstanceDataArray.Empty();
+	Super::EndPlay(EndPlayReason);
 }
 
 void ASkelotExampleCollisionAvoidance::Tick(float DeltaTime)
@@ -536,6 +557,12 @@ void ASkelotExampleGeometryTools::BeginPlay()
 	SpawnInstancesWithCurrentPattern();
 }
 
+void ASkelotExampleGeometryTools::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	ClearInstances();
+	Super::EndPlay(EndPlayReason);
+}
+
 void ASkelotExampleGeometryTools::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -715,7 +742,7 @@ void ASkelotExampleGeometryTools::SpawnWithBezierPattern()
 
 	for (int32 i = 0; i < BezierSampleCount; ++i)
 	{
-		float Progress = static_cast<float>(i) / static_cast<float>(BezierSampleCount - 1);
+		float Progress = (BezierSampleCount > 1) ? (static_cast<float>(i) / static_cast<float>(BezierSampleCount - 1)) : 0.0f;
 		FVector Point = USkelotGeometryTools::GetBezierPoint(BezierControlPoints, Progress);
 
 		// 将点转换到世界空间
@@ -748,6 +775,20 @@ void ASkelotExampleStressTest::BeginPlay()
 	{
 		StartTest();
 	}
+}
+
+void ASkelotExampleStressTest::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (bTestRunning)
+	{
+		bTestRunning = false;
+	}
+	if (InstanceHandles.Num() > 0)
+	{
+		USkelotWorldSubsystem::Skelot_DestroyInstances(this, InstanceHandles);
+		InstanceHandles.Empty();
+	}
+	Super::EndPlay(EndPlayReason);
 }
 
 void ASkelotExampleStressTest::Tick(float DeltaTime)
@@ -971,7 +1012,7 @@ void ASkelotExampleStressTest::UpdateFPSStats(float DeltaTime)
 	if (FPSFrameCount > 0)
 	{
 		AverageFPS = FPSAccumulator / FPSFrameCount;
-		AverageFrameTimeMs = 1000.0f / AverageFPS;
+		AverageFrameTimeMs = (AverageFPS > 0.0f) ? (1000.0f / AverageFPS) : 0.0f;
 	}
 
 	if (CurrentFPS > 0.0f)

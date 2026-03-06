@@ -91,15 +91,13 @@ void FSkelotSpatialGrid::RebuildIncremental(const FSkelotInstancesSOA& SOA, int3
 		return;
 	}
 
-	// 更新帧计数器
-	CurrentFrameIndex = (CurrentFrameIndex + 1) % FrameStride;
-
-	// 只有当 CurrentFrameIndex == 0 时才重建
+	// 只有当 CurrentFrameIndex == 0 时才重建（确保首帧不跳过）
 	if (CurrentFrameIndex == 0)
 	{
 		Rebuild(SOA, NumInstances);
 	}
-	// 否则跳过更新，使用上一帧的网格数据
+	// 递增放在检查之后，保证首次调用时 CurrentFrameIndex==0 不会被跳过
+	CurrentFrameIndex = (CurrentFrameIndex + 1) % FrameStride;
 }
 
 void FSkelotSpatialGrid::ForceFullRebuild(const FSkelotInstancesSOA& SOA, int32 NumInstances)

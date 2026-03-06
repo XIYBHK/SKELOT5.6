@@ -465,7 +465,17 @@ void FSkelotAssetTypeActions_SkeletalMesh::CreateAllSkelotAssets(const TArray<FS
 			{
 				if (!DeleteExistingAsset(AnimFullPath))
 				{
-					AnimStats.Failed++;
+					// 删除失败，尝试加载已有的 AnimCollection 作为回退
+					AnimCollection = Cast<USkelotAnimCollection>(UEditorAssetLibrary::LoadAsset(AnimFullPath));
+					if (AnimCollection)
+					{
+						AnimStats.Skipped++;
+						bAnimReady = true;
+					}
+					else
+					{
+						AnimStats.Failed++;
+					}
 				}
 				else
 				{
@@ -588,6 +598,11 @@ void FSkelotAssetTypeActions_SkeletalMesh::CreateAllSkelotAssets(const TArray<FS
 		FSkelotMeshRenderDesc MeshDesc;
 		MeshDesc.Mesh = SkeletalMesh;
 		RenderParams->Data.Meshes.Add(MeshDesc);
+		if (!bAnimReady && UEditorAssetLibrary::DoesAssetExist(AnimFullPath))
+		{
+			AnimCollection = Cast<USkelotAnimCollection>(UEditorAssetLibrary::LoadAsset(AnimFullPath));
+			bAnimReady = (AnimCollection != nullptr);
+		}
 		RenderParams->Data.AnimCollection = bAnimReady ? AnimCollection : nullptr;
 		RenderParams->Data.bRenderInMainPass = true;
 		RenderParams->Data.bRenderInDepthPass = true;

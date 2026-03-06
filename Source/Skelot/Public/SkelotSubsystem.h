@@ -345,7 +345,7 @@ public:
 	static void SkelotBindToComponent(const UObject* WorldContextObject, FSkelotInstanceHandle Handle, USkeletalMeshComponent* Component, int32 UserData, bool bCopyTransform);
 	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintCallable, Category="Skelot|工具", meta=(WorldContext="WorldContextObject", DisplayName = "从组件解绑"))
-	static void SkelotUnbindFromComponent(const UObject* WorldContextObject, FSkelotInstanceHandle Handle, bool bKeepDynamicPoseEnabled, USkeletalMeshComponent*& OutComponent, int32& OuUserData);
+	static void SkelotUnbindFromComponent(const UObject* WorldContextObject, FSkelotInstanceHandle Handle, bool bKeepDynamicPoseEnabled, USkeletalMeshComponent*& OutComponent, int32& OutUserData);
 
 	//////////////////////////////////////////////////////////////////////////
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Skelot|工具", meta=(WorldContext="WorldContextObject", DisplayName = "获取绑定的组件"))

@@ -197,8 +197,14 @@ TArray<FVector> USkelotGeometryTools::GetPointsByShape(UPrimitiveComponent* Shap
 		if (bSurfaceOnly)
 		{
 			// 球面点 - 使用球坐标均匀采样
-			const int32 NumTheta = FMath::CeilToInt(2.0f * PI * SphereRadius / Distance);
-			const int32 NumPhi = FMath::CeilToInt(PI * SphereRadius / Distance);
+			if (SphereRadius < KINDA_SMALL_NUMBER || Distance < KINDA_SMALL_NUMBER)
+			{
+				Points.Add(Origin);
+				return Points;
+			}
+
+			const int32 NumTheta = FMath::Max(1, FMath::CeilToInt(2.0f * PI * SphereRadius / Distance));
+			const int32 NumPhi = FMath::Max(1, FMath::CeilToInt(PI * SphereRadius / Distance));
 
 			for (int32 i = 0; i <= NumTheta; ++i)
 			{
@@ -390,8 +396,14 @@ TArray<FVector> USkelotGeometryTools::GetPointsByShape(UPrimitiveComponent* Shap
 		if (bSurfaceOnly)
 		{
 			// 胶囊表面 - 圆柱体表面 + 两个半球
-			const int32 CountAngle = FMath::CeilToInt(2.0f * PI * CapsuleRadius / Distance);
-			const int32 CountHeight = FMath::CeilToInt(CylinderHalfHeight * 2.0f / Distance);
+			if (CapsuleRadius < KINDA_SMALL_NUMBER || Distance < KINDA_SMALL_NUMBER)
+			{
+				Points.Add(Origin);
+				return Points;
+			}
+
+			const int32 CountAngle = FMath::Max(1, FMath::CeilToInt(2.0f * PI * CapsuleRadius / Distance));
+			const int32 CountHeight = FMath::Max(1, FMath::CeilToInt(CylinderHalfHeight * 2.0f / Distance));
 
 			// 圆柱体表面
 			for (int32 Angle = 0; Angle < CountAngle; ++Angle)
@@ -954,7 +966,7 @@ TArray<FVector> USkelotGeometryTools::GetPointsBySpline(USplineComponent* Spline
 		for (int32 Y = 0; Y < CountY; ++Y)
 		{
 			// 计算垂直方向的偏移
-			const float OffsetY = (static_cast<float>(Y) / FMath::Max(1, CountY - 1) - 0.5f) * Width;
+			const float OffsetY = (CountY <= 1) ? 0.0f : ((static_cast<float>(Y) / (CountY - 1) - 0.5f) * Width);
 
 			FVector Point = SplinePos + SplineRight * OffsetY;
 
