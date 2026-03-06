@@ -133,7 +133,7 @@ public:
 	 * @param SpatialGrid 空间网格
 	 */
 	void SolveIteration(FSkelotInstancesSOA& SOA, int32 NumInstances,
-						const FSkelotSpatialGrid& SpatialGrid);
+						const FSkelotSpatialGrid& SpatialGrid, float DeltaTime);
 
 	/**
 	 * 执行障碍物碰撞求解
@@ -142,7 +142,8 @@ public:
 	 * @param Obstacles 障碍物数组
 	 */
 	void SolveObstacleCollisions(FSkelotInstancesSOA& SOA, int32 NumInstances,
-								 const TArray<TObjectPtr<ASkelotObstacle>>& Obstacles);
+								 const TArray<TObjectPtr<ASkelotObstacle>>& Obstacles,
+								 float DeltaTime);
 
 	/** 获取统计信息：处理的碰撞对数量 */
 	int32 GetProcessedCollisionPairs() const { return ProcessedCollisionPairs; }

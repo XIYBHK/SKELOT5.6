@@ -285,6 +285,8 @@ private:
 		FVector CurrentTarget;
 		bool bArrived;
 		float WaitTimer;
+		bool bIsWalkAnimationPlaying = false;
+		bool bIsIdleAnimationPlaying = false;
 	};
 
 	/** 实例数据数组（不使用UPROPERTY，纯C++容器） */

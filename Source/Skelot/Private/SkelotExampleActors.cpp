@@ -4,10 +4,38 @@
 #include "SkelotWorld.h"
 #include "SkelotGeometryTools.h"
 #include "Animation/AnimSequence.h"
+#include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "GameFramework/PlayerController.h"
+
+namespace
+{
+	APlayerController* GetExamplePlayerController(const AActor* Actor)
+	{
+		UWorld* World = Actor ? Actor->GetWorld() : nullptr;
+		return World ? World->GetFirstPlayerController() : nullptr;
+	}
+
+	uint64 GetStressTestHUDMessageKey(const ASkelotExampleStressTest* Actor, int32 LineIndex)
+	{
+		return (static_cast<uint64>(reinterpret_cast<UPTRINT>(Actor)) << 8) + static_cast<uint64>(LineIndex);
+	}
+
+	void ClearStressTestHUDMessages(const ASkelotExampleStressTest* Actor, int32 MaxLines = 32)
+	{
+		if (!GEngine || !Actor)
+		{
+			return;
+		}
+
+		for (int32 LineIndex = 0; LineIndex < MaxLines; ++LineIndex)
+		{
+			GEngine->RemoveOnScreenDebugMessage(GetStressTestHUDMessageKey(Actor, LineIndex));
+		}
+	}
+}
 
 //////////////////////////////////////////////////////////////////////////
 // ASkelotExampleBasicInstance
@@ -195,7 +223,7 @@ void ASkelotExampleBasicInstance::ToggleAnimationPaused()
 
 void ASkelotExampleBasicInstance::HandleKeyboardInput()
 {
-	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	APlayerController* PC = GetExamplePlayerController(this);
 	if (!PC)
 	{
 		return;
@@ -324,6 +352,8 @@ void ASkelotExampleCollisionAvoidance::InitializeInstances()
 		Data.CurrentTarget = GetActorLocation() + TargetLocation;
 		Data.bArrived = false;
 		Data.WaitTimer = 0.0f;
+		Data.bIsWalkAnimationPlaying = false;
+		Data.bIsIdleAnimationPlaying = false;
 		InstanceDataArray.Add(Data);
 	}
 
@@ -338,6 +368,12 @@ void ASkelotExampleCollisionAvoidance::InitializeInstances()
 		for (const FInstanceData& Data : InstanceDataArray)
 		{
 			SkelotWorld->InstancePlayAnimation(Data.Handle.InstanceIndex, Params);
+		}
+
+		for (FInstanceData& Data : InstanceDataArray)
+		{
+			Data.bIsWalkAnimationPlaying = true;
+			Data.bIsIdleAnimationPlaying = false;
 		}
 	}
 
@@ -393,7 +429,7 @@ void ASkelotExampleCollisionAvoidance::SetNewTarget(const FVector& NewTarget)
 
 void ASkelotExampleCollisionAvoidance::HandleKeyboardInput()
 {
-	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	APlayerController* PC = GetExamplePlayerController(this);
 	if (!PC)
 	{
 		return;
@@ -467,13 +503,15 @@ void ASkelotExampleCollisionAvoidance::UpdateInstanceMovement(float DeltaTime)
 			SkelotWorld->SetInstanceVelocity(Data.Handle.InstanceIndex, FVector3f::ZeroVector);
 
 			// 播放待机动画
-			if (IdleAnimation && Data.WaitTimer == 0.0f)
+			if (IdleAnimation && !Data.bIsIdleAnimationPlaying)
 			{
 				FSkelotAnimPlayParams Params;
 				Params.Animation = IdleAnimation;
 				Params.bLoop = true;
 				Params.PlayScale = 1.0f;
 				SkelotWorld->InstancePlayAnimation(Data.Handle.InstanceIndex, Params);
+				Data.bIsIdleAnimationPlaying = true;
+				Data.bIsWalkAnimationPlaying = false;
 			}
 		}
 		else
@@ -502,13 +540,15 @@ void ASkelotExampleCollisionAvoidance::UpdateInstanceMovement(float DeltaTime)
 				SkelotWorld->SetInstanceRotation(Data.Handle.InstanceIndex, FQuat4f(TargetRotation));
 
 				// 播放行走动画
-				if (WalkAnimation)
+				if (WalkAnimation && !Data.bIsWalkAnimationPlaying)
 				{
 					FSkelotAnimPlayParams Params;
 					Params.Animation = WalkAnimation;
 					Params.bLoop = true;
 					Params.PlayScale = 1.0f;
 					SkelotWorld->InstancePlayAnimation(Data.Handle.InstanceIndex, Params);
+					Data.bIsWalkAnimationPlaying = true;
+					Data.bIsIdleAnimationPlaying = false;
 				}
 			}
 		}
@@ -624,7 +664,7 @@ FString ASkelotExampleGeometryTools::GetCurrentPatternName() const
 
 void ASkelotExampleGeometryTools::HandleKeyboardInput()
 {
-	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	APlayerController* PC = GetExamplePlayerController(this);
 	if (!PC)
 	{
 		return;
@@ -779,6 +819,8 @@ void ASkelotExampleStressTest::BeginPlay()
 
 void ASkelotExampleStressTest::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	ClearStressTestHUDMessages(this);
+
 	if (bTestRunning)
 	{
 		bTestRunning = false;
@@ -901,6 +943,8 @@ void ASkelotExampleStressTest::StopTest()
 		return;
 	}
 
+	ClearStressTestHUDMessages(this);
+
 	// 销毁所有实例
 	USkelotWorldSubsystem::Skelot_DestroyInstances(this, InstanceHandles);
 	InstanceHandles.Empty();
@@ -945,7 +989,7 @@ FString ASkelotExampleStressTest::GetTestModeName() const
 
 void ASkelotExampleStressTest::HandleKeyboardInput()
 {
-	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	APlayerController* PC = GetExamplePlayerController(this);
 	if (!PC)
 	{
 		return;
@@ -969,6 +1013,10 @@ void ASkelotExampleStressTest::HandleKeyboardInput()
 	if (PC->WasInputKeyJustPressed(ToggleHUDKey))
 	{
 		bShowHUD = !bShowHUD;
+		if (!bShowHUD)
+		{
+			ClearStressTestHUDMessages(this);
+		}
 	}
 }
 
@@ -1030,21 +1078,10 @@ void ASkelotExampleStressTest::UpdateFPSStats(float DeltaTime)
 void ASkelotExampleStressTest::DrawHUD()
 {
 #if ENABLE_DRAW_DEBUG
-	// 使用 DrawDebug 绘制 HUD 信息
-	if (!GetWorld())
+	if (!GEngine)
 	{
 		return;
 	}
-
-	APlayerController* PC = GetWorld()->GetFirstPlayerController();
-	if (!PC)
-	{
-		return;
-	}
-
-	// HUD 起始位置
-	FVector2D HUDPos(50.0f, 50.0f);
-	float LineHeight = 25.0f * HUDTextSize;
 
 	// 构建 HUD 文本
 	TArray<FString> Lines;
@@ -1083,11 +1120,21 @@ void ASkelotExampleStressTest::DrawHUD()
 	Lines.Add(TEXT("M: 切换模式"));
 	Lines.Add(TEXT("H: 切换HUD"));
 
-	// 绘制文本
+	// 绘制屏幕 HUD 文本
 	for (int32 i = 0; i < Lines.Num(); ++i)
 	{
-		FVector TextPos(HUDPos.X, 0.0f, HUDPos.Y + i * LineHeight);
-		DrawDebugString(GetWorld(), TextPos, Lines[i], nullptr, FColor::White, 0.0f, false, HUDTextSize);
+		GEngine->AddOnScreenDebugMessage(
+			GetStressTestHUDMessageKey(this, i),
+			0.1f,
+			FColor::White,
+			Lines[i],
+			false,
+			FVector2D(HUDTextSize, HUDTextSize));
+	}
+
+	for (int32 i = Lines.Num(); i < 32; ++i)
+	{
+		GEngine->RemoveOnScreenDebugMessage(GetStressTestHUDMessageKey(this, i));
 	}
 #endif
 }

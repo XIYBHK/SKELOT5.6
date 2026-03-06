@@ -6,6 +6,91 @@
 #include "SkelotWorld.h"
 #include "Async/ParallelFor.h"
 
+namespace
+{
+	struct FObstacleCollisionData
+	{
+		ESkelotObstacleType Type = ESkelotObstacleType::Sphere;
+		uint8 CollisionMask = 0xFF;
+		float RadiusOffset = 0.0f;
+		float SphereRadius = 0.0f;
+		FVector BoxExtent = FVector::ZeroVector;
+		FTransform Transform = FTransform::Identity;
+		FQuat Rotation = FQuat::Identity;
+		FVector Location = FVector::ZeroVector;
+	};
+
+	bool ComputeObstacleCollisionResponse(const FObstacleCollisionData& ObstacleData, const FVector& InstanceLocation,
+		float InstanceRadius, FVector& OutPushDirection, float& OutPushMagnitude)
+	{
+		OutPushDirection = FVector::ZeroVector;
+		OutPushMagnitude = 0.0f;
+
+		if (ObstacleData.Type == ESkelotObstacleType::Sphere)
+		{
+			const float EffectiveRadius = ObstacleData.SphereRadius + ObstacleData.RadiusOffset;
+			const float MinDist = EffectiveRadius + InstanceRadius;
+
+			const FVector Delta = InstanceLocation - ObstacleData.Location;
+			const float DistSq = Delta.SquaredLength();
+			if (DistSq >= MinDist * MinDist)
+			{
+				return false;
+			}
+
+			const float Dist = FMath::Sqrt(DistSq);
+			if (Dist < KINDA_SMALL_NUMBER)
+			{
+				OutPushDirection = FVector(1.0f, 0.0f, 0.0f);
+				OutPushMagnitude = MinDist;
+				return true;
+			}
+
+			OutPushDirection = Delta / Dist;
+			OutPushMagnitude = MinDist - Dist;
+			return true;
+		}
+
+		const FVector LocalPoint = ObstacleData.Transform.InverseTransformPosition(InstanceLocation);
+		const FVector EffectiveExtent = ObstacleData.BoxExtent + FVector(ObstacleData.RadiusOffset);
+		const FVector ExpandedExtent = EffectiveExtent + FVector(InstanceRadius);
+
+		if (FMath::Abs(LocalPoint.X) >= ExpandedExtent.X ||
+			FMath::Abs(LocalPoint.Y) >= ExpandedExtent.Y ||
+			FMath::Abs(LocalPoint.Z) >= ExpandedExtent.Z)
+		{
+			return false;
+		}
+
+		const float DX = ExpandedExtent.X - FMath::Abs(LocalPoint.X);
+		const float DY = ExpandedExtent.Y - FMath::Abs(LocalPoint.Y);
+		const float DZ = ExpandedExtent.Z - FMath::Abs(LocalPoint.Z);
+
+		FVector LocalPushDir = FVector::ZeroVector;
+		float Penetration = 0.0f;
+
+		if (DX <= DY && DX <= DZ)
+		{
+			Penetration = DX;
+			LocalPushDir = FVector(LocalPoint.X >= 0 ? 1.0f : -1.0f, 0.0f, 0.0f);
+		}
+		else if (DY <= DX && DY <= DZ)
+		{
+			Penetration = DY;
+			LocalPushDir = FVector(0.0f, LocalPoint.Y >= 0 ? 1.0f : -1.0f, 0.0f);
+		}
+		else
+		{
+			Penetration = DZ;
+			LocalPushDir = FVector(0.0f, 0.0f, LocalPoint.Z >= 0 ? 1.0f : -1.0f);
+		}
+
+		OutPushDirection = ObstacleData.Rotation.RotateVector(LocalPushDir);
+		OutPushMagnitude = Penetration;
+		return true;
+	}
+}
+
 FSkelotPBDCollisionSystem::FSkelotPBDCollisionSystem()
 	: Config(FSkelotPBDConfig::GetRecommendedConfig())
 	, ProcessedCollisionPairs(0)
@@ -117,8 +202,13 @@ void FSkelotPBDCollisionSystem::ApplyVelocityProjection(FSkelotInstancesSOA& SOA
 	// 如果速度方向与校正方向相反（即速度指向另一个实例），需要投影
 	if (VelocityDotCorrection < 0.0f)
 	{
-		// 移除速度在碰撞方向上的分量
-		FVector3f ProjectedVelocity = Velocity - CorrectionDir * VelocityDotCorrection * Config.VelocityProjectionStrength;
+		const float ProjectionAlpha = FMath::Clamp(
+			Config.VelocityProjectionStrength * (1.0f - FMath::Exp(-Config.VelocityRecoveryRate * DeltaTime)),
+			0.0f,
+			1.0f);
+
+		// 按帧时间平滑移除速度在碰撞方向上的分量，避免重新穿透
+		FVector3f ProjectedVelocity = Velocity - CorrectionDir * VelocityDotCorrection * ProjectionAlpha;
 		Velocity = ProjectedVelocity;
 	}
 }
@@ -148,16 +238,15 @@ void FSkelotPBDCollisionSystem::SolveCollisions(FSkelotInstancesSOA& SOA, int32 
 		}
 	}
 
-	// 执行多次迭代
-	int32 TotalIterations = Config.IterationCount + Config.PostObstacleIterations;
-	for (int32 Iter = 0; Iter < TotalIterations; Iter++)
+	// 这里只处理实例间碰撞；障碍物后额外迭代由调用方在需要时单独执行
+	for (int32 Iter = 0; Iter < Config.IterationCount; Iter++)
 	{
-		SolveIteration(SOA, NumInstances, SpatialGrid);
+		SolveIteration(SOA, NumInstances, SpatialGrid, DeltaTime);
 	}
 }
 
 void FSkelotPBDCollisionSystem::SolveIteration(FSkelotInstancesSOA& SOA, int32 NumInstances,
-											   const FSkelotSpatialGrid& SpatialGrid)
+											   const FSkelotSpatialGrid& SpatialGrid, float DeltaTime)
 {
 	TArray<int32> PerInstancePairCounts;
 	TArray<float> PerInstanceCorrectionSums;
@@ -241,43 +330,76 @@ void FSkelotPBDCollisionSystem::SolveIteration(FSkelotInstancesSOA& SOA, int32 N
 			// 将 FVector3f 校正量添加到 FVector3d 位置
 			SOA.Locations[i] += FVector3d(Correction);
 
-			// TODO: 如果需要，可以在这里调用速度投影
-			// ApplyVelocityProjection(SOA, i, Correction, DeltaTime);
+			ApplyVelocityProjection(SOA, i, Correction, DeltaTime);
 		}
 	}
 }
 
 void FSkelotPBDCollisionSystem::SolveObstacleCollisions(FSkelotInstancesSOA& SOA, int32 NumInstances,
-														 const TArray<TObjectPtr<ASkelotObstacle>>& Obstacles)
+														 const TArray<TObjectPtr<ASkelotObstacle>>& Obstacles,
+														 float DeltaTime)
 {
 	if (Obstacles.Num() == 0)
 	{
 		return;
 	}
 
-	// 遍历所有实例，处理与障碍物的碰撞
-	for (int32 InstanceIndex = 0; InstanceIndex < NumInstances; InstanceIndex++)
+	TArray<FObstacleCollisionData> ObstacleDataArray;
+	ObstacleDataArray.Reserve(Obstacles.Num());
+	for (const TObjectPtr<ASkelotObstacle>& ObstaclePtr : Obstacles)
+	{
+		const ASkelotObstacle* Obstacle = ObstaclePtr.Get();
+		if (!Obstacle || !Obstacle->bEnabled)
+		{
+			continue;
+		}
+
+		FObstacleCollisionData ObstacleData;
+		ObstacleData.Type = Obstacle->ObstacleType;
+		ObstacleData.CollisionMask = Obstacle->CollisionMask;
+		ObstacleData.RadiusOffset = Obstacle->RadiusOffset;
+		ObstacleData.Transform = Obstacle->GetActorTransform();
+		ObstacleData.Rotation = Obstacle->GetActorQuat();
+		ObstacleData.Location = Obstacle->GetActorLocation();
+
+		if (const ASkelotSphereObstacle* SphereObstacle = Cast<ASkelotSphereObstacle>(Obstacle))
+		{
+			ObstacleData.SphereRadius = SphereObstacle->Radius;
+		}
+		else if (const ASkelotBoxObstacle* BoxObstacle = Cast<ASkelotBoxObstacle>(Obstacle))
+		{
+			ObstacleData.BoxExtent = BoxObstacle->BoxExtent;
+		}
+
+		ObstacleDataArray.Add(ObstacleData);
+	}
+
+	if (ObstacleDataArray.Num() == 0)
+	{
+		return;
+	}
+
+	TArray<float> PerInstanceCorrectionSums;
+	PerInstanceCorrectionSums.SetNumZeroed(NumInstances);
+
+	ParallelFor(NumInstances, [&](int32 InstanceIndex)
 	{
 		// 跳过已销毁的实例
 		if (SOA.Slots[InstanceIndex].bDestroyed)
 		{
-			continue;
+			return;
 		}
 
 		FVector InstanceLocation(SOA.Locations[InstanceIndex]);
 		float InstanceRadius = Config.CollisionRadius;
 		uint8 InstanceCollisionMask = SOA.CollisionMasks[InstanceIndex];
+		float LocalCorrectionSum = 0.0f;
 
 		// 遍历所有障碍物
-		for (const TObjectPtr<ASkelotObstacle>& ObstaclePtr : Obstacles)
+		for (const FObstacleCollisionData& ObstacleData : ObstacleDataArray)
 		{
-			if (!ObstaclePtr.Get() || !ObstaclePtr->bEnabled)
-			{
-				continue;
-			}
-
 			// 检查碰撞掩码
-			if ((InstanceCollisionMask & ObstaclePtr->CollisionMask) == 0)
+			if ((InstanceCollisionMask & ObstacleData.CollisionMask) == 0)
 			{
 				continue;
 			}
@@ -285,15 +407,23 @@ void FSkelotPBDCollisionSystem::SolveObstacleCollisions(FSkelotInstancesSOA& SOA
 			FVector PushDirection;
 			float PushMagnitude;
 
-			if (ObstaclePtr->ComputeCollisionResponse(InstanceLocation, InstanceRadius, PushDirection, PushMagnitude))
+			if (ComputeObstacleCollisionResponse(ObstacleData, InstanceLocation, InstanceRadius, PushDirection, PushMagnitude))
 			{
 				// 应用位置校正（使用松弛系数）
 				FVector3f Correction = FVector3f(PushDirection * PushMagnitude * Config.RelaxationFactor);
 				SOA.Locations[InstanceIndex] += FVector3d(Correction);
+				InstanceLocation += FVector(Correction);
+				ApplyVelocityProjection(SOA, InstanceIndex, Correction, DeltaTime);
 
-				// 更新统计
-				TotalCorrection += Correction.Size();
+				LocalCorrectionSum += Correction.Size();
 			}
 		}
+
+		PerInstanceCorrectionSums[InstanceIndex] = LocalCorrectionSum;
+	});
+
+	for (float CorrectionSum : PerInstanceCorrectionSums)
+	{
+		TotalCorrection += CorrectionSum;
 	}
 }

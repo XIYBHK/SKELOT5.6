@@ -187,7 +187,7 @@ bool FSkelotRVOSystem::ComputeAgentAvoidance(const FSkelotInstancesSOA& SOA, int
 	MaxSpeed = FMath::Max(MaxSpeed, Config.MinSpeed);
 
 	LocalNeighborIndices.Reset();
-	SpatialGrid.QuerySphere(FVector(MyPos3D), Config.NeighborRadius, LocalNeighborIndices);
+	SpatialGrid.QuerySphere(FVector(MyPos3D), Config.NeighborRadius, LocalNeighborIndices, 0xFF, &SOA);
 
 	int32 NumNeighbors = FMath::Min(LocalNeighborIndices.Num(), Config.MaxNeighbors);
 
@@ -569,7 +569,7 @@ FVector3f FSkelotRVOSystem::ApplyVelocitySmoothing(int32 InstanceIndex,
 	FRVOAgentData& AgentData = GetOrCreateAgentData(InstanceIndex);
 
 	// 基于 Unity SmoothDamp 算法
-	float SmoothTime = 1.0f / AntiJitterConfig.VelocitySmoothFactor;
+	float SmoothTime = FMath::Max(AntiJitterConfig.VelocitySmoothFactor, RVO_EPSILON);
 	float Omega = 2.0f / SmoothTime;
 	float X = Omega * DeltaTime;
 	float Exp = 1.0f / (1.0f + X + 0.48f * X * X + 0.235f * X * X * X);
@@ -621,12 +621,14 @@ bool FSkelotRVOSystem::DetectJitter(int32 InstanceIndex, const FVector3f& NewDir
 
 float FSkelotRVOSystem::GetDensityAdaptationFactor(int32 NeighborCount) const
 {
-	if (NeighborCount <= AntiJitterConfig.DensityThreshold)
+	const int32 SafeDensityThreshold = FMath::Max(AntiJitterConfig.DensityThreshold, 1);
+
+	if (NeighborCount <= SafeDensityThreshold)
 	{
 		return 1.0f;
 	}
 
-	float ExcessRatio = (float)(NeighborCount - AntiJitterConfig.DensityThreshold) / AntiJitterConfig.DensityThreshold;
+	float ExcessRatio = (float)(NeighborCount - SafeDensityThreshold) / SafeDensityThreshold;
 	return AntiJitterConfig.HighDensityRelaxation / (1.0f + ExcessRatio);
 }
 

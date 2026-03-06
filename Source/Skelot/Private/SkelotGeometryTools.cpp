@@ -1,6 +1,7 @@
 // Copyright 2024 Lazy Marmot Games. All Rights Reserved.
 
 #include "SkelotGeometryTools.h"
+#include "Algo/BinarySearch.h"
 #include "Components/ShapeComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/BoxComponent.h"
@@ -105,8 +106,13 @@ TArray<FVector> USkelotGeometryTools::GetPointsByGrid(
 	}
 
 	// 预分配空间
-	const int32 TotalCount = CountX * CountY * CountZ;
-	Points.Reserve(TotalCount);
+	const int64 TotalCount64 = static_cast<int64>(CountX) * CountY * CountZ;
+	if (TotalCount64 > MAX_int32)
+	{
+		return Points;
+	}
+
+	Points.Reserve(static_cast<int32>(TotalCount64));
 
 	// 生成网格点
 	for (int32 Z = 0; Z < CountZ; ++Z)
@@ -307,7 +313,7 @@ TArray<FVector> USkelotGeometryTools::GetPointsByShape(UPrimitiveComponent* Shap
 			// 前后表面 (XZ 平面)
 			for (int32 X = 0; X <= CountX; ++X)
 			{
-				for (int32 Z = 0; Z <= CountZ; ++Z)
+				for (int32 Z = 1; Z < CountZ; ++Z)
 				{
 					FVector LocalPoint(
 						-BoxExtent.X + X * Distance,
@@ -326,9 +332,9 @@ TArray<FVector> USkelotGeometryTools::GetPointsByShape(UPrimitiveComponent* Shap
 			}
 
 			// 左右表面 (YZ 平面)
-			for (int32 Y = 0; Y <= CountY; ++Y)
+			for (int32 Y = 1; Y < CountY; ++Y)
 			{
-				for (int32 Z = 0; Z <= CountZ; ++Z)
+				for (int32 Z = 1; Z < CountZ; ++Z)
 				{
 					FVector LocalPoint(
 						BoxExtent.X,
@@ -647,15 +653,8 @@ TArray<FVector> USkelotGeometryTools::GetPointsByMesh(UStaticMesh* Mesh, FTransf
 	{
 		float RandomArea = FMath::FRand() * TotalArea;
 
-		int32 SelectedTriIndex = 0;
-		for (int32 j = 0; j < CumulativeAreas.Num(); ++j)
-		{
-			if (CumulativeAreas[j] >= RandomArea)
-			{
-				SelectedTriIndex = j;
-				break;
-			}
-		}
+		int32 SelectedTriIndex = Algo::LowerBound(CumulativeAreas, RandomArea);
+		SelectedTriIndex = FMath::Clamp(SelectedTriIndex, 0, CumulativeAreas.Num() - 1);
 
 		const int32 TriBase = SelectedTriIndex * 3;
 		FVector Point = GetRandomPointInTriangle(AllTriangles[TriBase], AllTriangles[TriBase + 1], AllTriangles[TriBase + 2]);
@@ -1031,8 +1030,17 @@ void USkelotGeometryTools::GetPixelsByTexture(UTexture2D* Texture, int32 SampleS
 	}
 
 	const uint8* PixelData = static_cast<const uint8*>(Data);
+	const EPixelFormat PixelFormat = static_cast<EPixelFormat>(PlatformData->PixelFormat);
+	const bool bIsBGRA8 = PixelFormat == PF_B8G8R8A8;
+	const bool bIsRGBA8 = PixelFormat == PF_R8G8B8A8;
 
-	// 假设是 RGBA8 格式
+	if (!bIsBGRA8 && !bIsRGBA8)
+	{
+		Mip.BulkData.Unlock();
+		return;
+	}
+
+	// 仅支持 4 字节像素格式
 	const int32 BytesPerPixel = 4;
 
 	// 计算采样后的像素数量
@@ -1053,9 +1061,20 @@ void USkelotGeometryTools::GetPixelsByTexture(UTexture2D* Texture, int32 SampleS
 			if (PixelIndex + 3 < TextureWidth * TextureHeight * BytesPerPixel)
 			{
 				FColor Color;
-				Color.B = PixelData[PixelIndex + 0];
-				Color.G = PixelData[PixelIndex + 1];
-				Color.R = PixelData[PixelIndex + 2];
+
+				if (bIsBGRA8)
+				{
+					Color.B = PixelData[PixelIndex + 0];
+					Color.G = PixelData[PixelIndex + 1];
+					Color.R = PixelData[PixelIndex + 2];
+				}
+				else
+				{
+					Color.R = PixelData[PixelIndex + 0];
+					Color.G = PixelData[PixelIndex + 1];
+					Color.B = PixelData[PixelIndex + 2];
+				}
+
 				Color.A = PixelData[PixelIndex + 3];
 
 				OutColors.Add(Color);

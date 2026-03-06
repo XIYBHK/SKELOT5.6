@@ -2364,12 +2364,12 @@ void ASkelotWorld::SolvePBDCollisions(float DeltaTime)
 	// 执行障碍物碰撞求解
 	if (RegisteredObstacles.Num() > 0)
 	{
-		PBDCollisionSystem.SolveObstacleCollisions(SOA, GetNumInstance(), RegisteredObstacles);
+		PBDCollisionSystem.SolveObstacleCollisions(SOA, GetNumInstance(), RegisteredObstacles, DeltaTime);
 
 		// 如果有障碍物碰撞，执行额外迭代以提高稳定性
 		for (int32 i = 0; i < PBDConfig.PostObstacleIterations; i++)
 		{
-			PBDCollisionSystem.SolveObstacleCollisions(SOA, GetNumInstance(), RegisteredObstacles);
+			PBDCollisionSystem.SolveObstacleCollisions(SOA, GetNumInstance(), RegisteredObstacles, DeltaTime);
 		}
 	}
 }
