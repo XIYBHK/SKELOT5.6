@@ -88,6 +88,14 @@ void FSkelotRVOSystem::EnsureAgentDataCapacity(int32 NumInstances)
 	}
 }
 
+void FSkelotRVOSystem::ResetAgentDataForInstance(int32 InstanceIndex)
+{
+	if (AgentDataArray.IsValidIndex(InstanceIndex))
+	{
+		AgentDataArray[InstanceIndex] = FRVOAgentData();
+	}
+}
+
 //////////////////////////////////////////////////////////////////////////
 // Main Algorithm
 //////////////////////////////////////////////////////////////////////////
@@ -136,7 +144,9 @@ void FSkelotRVOSystem::ComputeAvoidance(FSkelotInstancesSOA& SOA, int32 NumInsta
 		}
 
 		TArray<int32> LocalNeighborIndices;
+		LocalNeighborIndices.Reserve(Config.MaxNeighbors);
 		TArray<FORCAPlane> LocalORCAPlanes;
+		LocalORCAPlanes.Reserve(Config.MaxNeighbors);
 
 		// 计算避障
 		FVector3f NewVelocity;
@@ -217,6 +227,16 @@ bool FSkelotRVOSystem::ComputeAgentAvoidance(const FSkelotInstancesSOA& SOA, int
 		}
 
 		const FVector3d& NeighborPos3D = SOA.Locations[NeighborIdx];
+
+		// 高度差过滤：不同高度的实例不参与 2D 避障
+		if (Config.HeightDifferenceThreshold > 0.0f)
+		{
+			const float HeightDiff = FMath::Abs(static_cast<float>(MyPos3D.Z - NeighborPos3D.Z));
+			if (HeightDiff > Config.HeightDifferenceThreshold)
+			{
+				continue;
+			}
+		}
 		const FVector3f& NeighborVel3D = InputVelocities[NeighborIdx];
 
 		FVector3f NeighborPos(NeighborPos3D.X, NeighborPos3D.Y, 0.0f);
@@ -344,16 +364,23 @@ void FSkelotRVOSystem::ComputeORCAPlaneInternal(const FVector2f& RelPos2D, const
 
 bool FSkelotRVOSystem::IsHeadOnCollision(const FVector2f& RelativePosition, const FVector2f& RelativeVelocity) const
 {
-	float RelPosLen = RelativePosition.Size();
-	float RelVelLen = RelativeVelocity.Size();
+	const float RelPosSq = RelativePosition.SquaredLength();
+	const float RelVelSq = RelativeVelocity.SquaredLength();
 
-	if (RelPosLen < RVO_EPSILON || RelVelLen < RVO_EPSILON)
+	if (RelPosSq < RVO_EPSILON * RVO_EPSILON || RelVelSq < RVO_EPSILON * RVO_EPSILON)
 	{
 		return false;
 	}
 
-	float DotProduct = FVector2f::DotProduct(RelativePosition / RelPosLen, RelativeVelocity / RelVelLen);
-	return DotProduct < Config.HRVOHeadOnThreshold;
+	// 避免两次 sqrt：dot(A/|A|, B/|B|) < threshold
+	// 等价于：dot(A,B) < 0 && dot(A,B)^2 > threshold^2 * |A|^2 * |B|^2
+	const float Dot = FVector2f::DotProduct(RelativePosition, RelativeVelocity);
+	if (Dot >= 0.0f)
+	{
+		return false;
+	}
+	const float ThresholdSq = Config.HRVOHeadOnThreshold * Config.HRVOHeadOnThreshold;
+	return (Dot * Dot) > (ThresholdSq * RelPosSq * RelVelSq);
 }
 
 //////////////////////////////////////////////////////////////////////////

@@ -153,6 +153,13 @@ private:
 	/** 总实例数（统计用） */
 	int32 TotalInstances;
 
+	/**
+	 * 球形查询内部实现（消除 QuerySphere / QuerySphereWithExclusion 重复代码）
+	 * @param FilterFunc 额外过滤函数，返回 true 表示保留该实例
+	 */
+	template<typename FilterFunc>
+	void QuerySphereInternal(const FVector& Center, float Radius, TArray<int32>& OutIndices,
+							 uint8 CollisionMask, const FSkelotInstancesSOA* SOA, FilterFunc Filter) const;
 };
 
 /**

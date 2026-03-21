@@ -111,8 +111,13 @@ const TArray<int32>* FSkelotSpatialGrid::GetCellInstances(const FIntVector& Cell
 	return GridCells.Find(CellKey);
 }
 
-void FSkelotSpatialGrid::QuerySphere(const FVector& Center, float Radius, TArray<int32>& OutIndices,
-									  uint8 CollisionMask, const FSkelotInstancesSOA* SOA) const
+//////////////////////////////////////////////////////////////////////////
+// 球形查询：公共逻辑提取到模板方法，消除 QuerySphere / QuerySphereWithExclusion 重复
+//////////////////////////////////////////////////////////////////////////
+
+template<typename FilterFunc>
+void FSkelotSpatialGrid::QuerySphereInternal(const FVector& Center, float Radius, TArray<int32>& OutIndices,
+											  uint8 CollisionMask, const FSkelotInstancesSOA* SOA, FilterFunc Filter) const
 {
 	OutIndices.Reset();
 
@@ -121,33 +126,34 @@ void FSkelotSpatialGrid::QuerySphere(const FVector& Center, float Radius, TArray
 		return;
 	}
 
-	// 计算需要检查的网格范围
-	float RadiusInCells = Radius * InvCellSize;
-	int32 CellRadius = FMath::CeilToInt(RadiusInCells);
+	checkf(SOA != nullptr, TEXT("QuerySphere: SOA 为空，结果精度将下降。建议传入有效的 SOA 指针。"));
 
-	FIntVector CenterCell = GetCellKey(Center);
-
-	// 计算半径平方用于距离检测（避免 sqrt）
-	float RadiusSquared = Radius * Radius;
+	const float RadiusSquared = Radius * Radius;
+	const int32 CellRadius = FMath::CeilToInt(Radius * InvCellSize);
+	const FIntVector CenterCell = GetCellKey(Center);
 	constexpr int32 FullScanCellRadiusThreshold = 32;
 
 	auto TryAddInstance = [&](int32 InstanceIndex)
 	{
+		if (!Filter(InstanceIndex))
+		{
+			return;
+		}
+
 		// 掩码过滤
 		if (CollisionMask != 0xFF && SOA)
 		{
-			uint8 InstanceMask = SOA->CollisionMasks[InstanceIndex];
-			if ((InstanceMask & CollisionMask) == 0)
+			if ((SOA->CollisionMasks[InstanceIndex] & CollisionMask) == 0)
 			{
 				return;
 			}
 		}
 
+		// 精确距离过滤
 		if (SOA)
 		{
 			const FVector InstanceLocation(SOA->Locations[InstanceIndex]);
-			const float DistSquared = (InstanceLocation - Center).SizeSquared();
-			if (DistSquared > RadiusSquared)
+			if ((InstanceLocation - Center).SizeSquared() > RadiusSquared)
 			{
 				return;
 			}
@@ -168,7 +174,6 @@ void FSkelotSpatialGrid::QuerySphere(const FVector& Center, float Radius, TArray
 		return;
 	}
 
-	// 遍历可能重叠的所有网格单元
 	for (int32 dz = -CellRadius; dz <= CellRadius; dz++)
 	{
 		for (int32 dy = -CellRadius; dy <= CellRadius; dy++)
@@ -190,84 +195,19 @@ void FSkelotSpatialGrid::QuerySphere(const FVector& Center, float Radius, TArray
 	}
 }
 
+void FSkelotSpatialGrid::QuerySphere(const FVector& Center, float Radius, TArray<int32>& OutIndices,
+									  uint8 CollisionMask, const FSkelotInstancesSOA* SOA) const
+{
+	QuerySphereInternal(Center, Radius, OutIndices, CollisionMask, SOA,
+		[](int32) { return true; });
+}
+
 void FSkelotSpatialGrid::QuerySphereWithExclusion(const FVector& Center, float Radius, TArray<int32>& OutIndices,
 												   const TSet<int32>& ExcludeIndices,
 												   uint8 CollisionMask, const FSkelotInstancesSOA* SOA) const
 {
-	OutIndices.Reset();
-
-	if (Radius <= 0.0f)
-	{
-		return;
-	}
-
-	float RadiusInCells = Radius * InvCellSize;
-	int32 CellRadius = FMath::CeilToInt(RadiusInCells);
-
-	FIntVector CenterCell = GetCellKey(Center);
-	float RadiusSquared = Radius * Radius;
-	constexpr int32 FullScanCellRadiusThreshold = 32;
-
-	auto TryAddInstance = [&](int32 InstanceIndex)
-	{
-		if (ExcludeIndices.Contains(InstanceIndex))
-		{
-			return;
-		}
-
-		if (CollisionMask != 0xFF && SOA)
-		{
-			uint8 InstanceMask = SOA->CollisionMasks[InstanceIndex];
-			if ((InstanceMask & CollisionMask) == 0)
-			{
-				return;
-			}
-		}
-
-		if (SOA)
-		{
-			const FVector InstanceLocation(SOA->Locations[InstanceIndex]);
-			const float DistSquared = (InstanceLocation - Center).SizeSquared();
-			if (DistSquared > RadiusSquared)
-			{
-				return;
-			}
-		}
-
-		OutIndices.Add(InstanceIndex);
-	};
-
-	if (CellRadius > FullScanCellRadiusThreshold)
-	{
-		for (const TPair<FIntVector, TArray<int32>>& CellPair : GridCells)
-		{
-			for (int32 InstanceIndex : CellPair.Value)
-			{
-				TryAddInstance(InstanceIndex);
-			}
-		}
-		return;
-	}
-
-	for (int32 dz = -CellRadius; dz <= CellRadius; dz++)
-	{
-		for (int32 dy = -CellRadius; dy <= CellRadius; dy++)
-		{
-			for (int32 dx = -CellRadius; dx <= CellRadius; dx++)
-			{
-				FIntVector CellKey = CenterCell + FIntVector(dx, dy, dz);
-				const TArray<int32>* CellInstances = GridCells.Find(CellKey);
-
-				if (CellInstances && CellInstances->Num() > 0)
-				{
-					for (int32 InstanceIndex : *CellInstances)
-					{
-						TryAddInstance(InstanceIndex);
-					}
-				}
-			}
-		}
-	}
+	QuerySphereInternal(Center, Radius, OutIndices, CollisionMask, SOA,
+		[&ExcludeIndices](int32 InstanceIndex) { return !ExcludeIndices.Contains(InstanceIndex); });
 }
 
 void FSkelotSpatialGrid::QueryBox(const FVector& BoxCenter, const FVector& BoxExtent, TArray<int32>& OutIndices,

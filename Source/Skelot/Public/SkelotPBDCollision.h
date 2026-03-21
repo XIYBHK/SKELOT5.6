@@ -32,7 +32,7 @@ struct FSkelotPBDConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PBD", meta = (ClampMin = "1", ClampMax = "8"))
 	int32 IterationCount = 3;
 
-	/** 障碍物后额外迭代次数 - 有障碍物时增加稳定性 */
+	/** 障碍物额外迭代次数 - 在基础1次障碍物碰撞之后，额外执行的迭代次数（0=只执行1次基础碰撞，1=共执行2次） */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PBD", meta = (ClampMin = "0", ClampMax = "4"))
 	int32 PostObstacleIterations = 1;
 

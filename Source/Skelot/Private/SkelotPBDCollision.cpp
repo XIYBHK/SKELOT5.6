@@ -224,19 +224,9 @@ void FSkelotPBDCollisionSystem::SolveCollisions(FSkelotInstancesSOA& SOA, int32 
 	// 重置统计
 	ResetStats();
 
-	// 预分配位置校正数组
-	if (PositionCorrections.Num() < NumInstances)
-	{
-		PositionCorrections.SetNumZeroed(NumInstances);
-	}
-	else
-	{
-		// 清零已有的校正量
-		for (int32 i = 0; i < NumInstances; i++)
-		{
-			PositionCorrections[i] = FVector3f::ZeroVector;
-		}
-	}
+	// 预分配并清零位置校正数组（SetNumZeroed 会自动扩展或缩减到目标大小）
+	PositionCorrections.SetNumUninitialized(NumInstances);
+	FMemory::Memzero(PositionCorrections.GetData(), NumInstances * sizeof(FVector3f));
 
 	// 这里只处理实例间碰撞；障碍物后额外迭代由调用方在需要时单独执行
 	for (int32 Iter = 0; Iter < Config.IterationCount; Iter++)
@@ -267,9 +257,9 @@ void FSkelotPBDCollisionSystem::SolveIteration(FSkelotInstancesSOA& SOA, int32 N
 		int32 LocalPairCount = 0;
 		float LocalCorrectionSum = 0.0f;
 
-		// 使用空间网格查询邻居（线程局部缓存）
+		// 使用空间网格查询邻居（线程局部缓存，预分配减少堆扩容）
 		TArray<int32> LocalNeighborIndices;
-		LocalNeighborIndices.Reset();
+		LocalNeighborIndices.Reserve(Config.MaxNeighbors);
 		SpatialGrid.QuerySphere(FVector(MyPos), Config.CollisionRadius * 2.0f, LocalNeighborIndices, 0xFF, &SOA);
 
 		// 限制邻居数量

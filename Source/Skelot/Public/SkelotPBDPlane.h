@@ -63,6 +63,10 @@ struct FSkelotRVOConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO", meta = (ClampMin = "-1.0", ClampMax = "0.0"))
 	float HRVOHeadOnThreshold = -0.5f;
 
+	/** 邻居高度差过滤阈值（厘米）- 高度差超过此值的实例不参与避障，0表示不过滤 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO", meta = (ClampMin = "0", ClampMax = "1000"))
+	float HeightDifferenceThreshold = 200.0f;
+
 	/** 默认构造 */
 	FSkelotRVOConfig() = default;
 
@@ -81,6 +85,7 @@ struct FSkelotRVOConfig
 		Config.FrameStride = 1;
 		Config.bEnableHRVO = false;
 		Config.HRVOHeadOnThreshold = -0.5f;
+		Config.HeightDifferenceThreshold = 200.0f;
 		return Config;
 	}
 };

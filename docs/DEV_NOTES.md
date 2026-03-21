@@ -855,4 +855,38 @@ void ComputeHRVOPlane(...)
 - 约束违反判定：`Det2D(direction, point - result) > 0` 表示 result 在约束允许区域外
 - LP1 交集：`denominator = Det2D(lineNo.dir, i.dir); numerator = Det2D(i.dir, lineNo.point - i.point)`
 
-*最后更新: 2026-03-06*
+## 代码核查修复记录 (2026-03-21)
+
+全面核查二次开发代码，发现并修复 8 个问题：
+
+### 1. RVO 邻居查询增加 Z 轴高度差过滤
+- **问题**：SpatialGrid 3D 查询 + RVO 2D 计算不一致，不同高度实例被错误避障
+- **解决**：`FSkelotRVOConfig` 新增 `HeightDifferenceThreshold` 参数（默认200cm），`ComputeAgentAvoidance` 中按高度差过滤邻居
+
+### 2. PBD 障碍物碰撞语义明确化
+- **问题**：`PostObstacleIterations` 注释不明确（是总次数还是额外次数）
+- **解决**：明确注释为"额外迭代次数"，基础1次+额外N次
+
+### 3. PositionCorrections 只增不减 + 清零优化
+- **问题**：数组只增不减可能浪费内存；逐元素清零效率低
+- **解决**：改用 `SetNumUninitialized` + `FMemory::Memzero` 统一处理
+
+### 4. 几何工具函数打包版添加警告
+- **问题**：`GetPointsByMesh`/`GetPointsByMeshVoxel` 仅编辑器可用，打包版静默返回空数组
+- **解决**：`#else` 分支添加 `UE_LOG(Warning)` 提示用户
+
+### 5. SkelotWorld.h 缩进修复
+- **问题**：第129-172行使用空格缩进，与上方 Tab 缩进不一致
+- **解决**：统一为 Tab 缩进
+
+### 6. QuerySphere 防御性检查
+- **问题**：SOA 为 nullptr 时跳过距离检查，可能返回球外实例
+- **解决**：添加 `checkf` 断言提醒开发者传入有效 SOA
+
+### 7. RVO AgentData 生命周期重置
+- **问题**：索引被回收的新实例会继承已销毁实例的残留 AgentData（平滑速度、抖动计数器等）
+- **解决**：`FSkelotRVOSystem::ResetAgentDataForInstance()` 在 `CreateInstance` 时调用
+
+### 8. 已合并到 #3
+
+*最后更新: 2026-03-21*

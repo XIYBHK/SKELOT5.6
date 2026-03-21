@@ -1169,6 +1169,9 @@ FSkelotInstanceHandle ASkelotWorld::CreateInstance(const FTransform& Transform, 
 	SOA.CollisionChannels[InstanceIdx] = SkelotCollision::DefaultCollisionChannel;
 	SOA.CollisionMasks[InstanceIdx] = SkelotCollision::DefaultCollisionMask;
 
+	// 重置 RVO 代理数据，防止复用索引时继承已销毁实例的残留状态
+	RVOSystem.ResetAgentDataForInstance(InstanceIdx);
+
 	SOA.CurAnimFrames[InstanceIdx] = 0;
 	SOA.PreAnimFrames[InstanceIdx] = 0;
 	new (&SOA.AnimDatas[InstanceIdx])  FSkelotInstancesSOA::FAnimData();
@@ -2562,12 +2565,11 @@ void ASkelotWorld::SolvePBDCollisions(float DeltaTime)
 	// 执行PBD碰撞求解（实例间碰撞）
 	PBDCollisionSystem.SolveCollisions(SOA, GetNumInstance(), ActiveSpatialGrid, DeltaTime);
 
-	// 执行障碍物碰撞求解
+	// 执行障碍物碰撞求解：1次基础 + PostObstacleIterations次额外
 	if (RegisteredObstacles.Num() > 0)
 	{
 		PBDCollisionSystem.SolveObstacleCollisions(SOA, GetNumInstance(), RegisteredObstacles, DeltaTime);
 
-		// 如果有障碍物碰撞，执行额外迭代以提高稳定性
 		for (int32 i = 0; i < PBDConfig.PostObstacleIterations; i++)
 		{
 			PBDCollisionSystem.SolveObstacleCollisions(SOA, GetNumInstance(), RegisteredObstacles, DeltaTime);

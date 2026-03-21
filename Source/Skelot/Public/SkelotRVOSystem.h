@@ -111,6 +111,9 @@ public:
 	/** 重置所有代理数据 */
 	void ResetAgentData();
 
+	/** 重置指定实例的代理数据（实例被回收重建时调用，防止状态残留） */
+	void ResetAgentDataForInstance(int32 InstanceIndex);
+
 private:
 	/** RVO 配置 */
 	FSkelotRVOConfig Config;

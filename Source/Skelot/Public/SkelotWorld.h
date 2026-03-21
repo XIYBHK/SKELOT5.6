@@ -126,50 +126,50 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skelot|PBD碰撞", meta = (DisplayName = "PBD配置"))
 	FSkelotPBDConfig PBDConfig;
 
-        // PBD更新帧计数器（用于UpdateFrequency）
-        int32 PBDUpdateFrameCounter = 0;
+	// PBD更新帧计数器（用于UpdateFrequency）
+	int32 PBDUpdateFrameCounter = 0;
 
-        //////////////////////////////////////////////////////////////////////////
-        // RVO/ORCA Avoidance System
-        // RVO/ORCA 避障系统 - 实例间的智能避障
+	//////////////////////////////////////////////////////////////////////////
+	// RVO/ORCA Avoidance System
+	// RVO/ORCA 避障系统 - 实例间的智能避障
 
-        // RVO 避障系统实例
-        FSkelotRVOSystem RVOSystem;
+	// RVO 避障系统实例
+	FSkelotRVOSystem RVOSystem;
 
-        // RVO 配置参数
-        UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skelot|RVO避障", meta = (DisplayName = "RVO配置"))
-        FSkelotRVOConfig RVOConfig;
+	// RVO 配置参数
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skelot|RVO避障", meta = (DisplayName = "RVO配置"))
+	FSkelotRVOConfig RVOConfig;
 
-        // 抗抖动配置参数
-        UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skelot|RVO避障", meta = (DisplayName = "抗抖动配置"))
-        FSkelotAntiJitterConfig AntiJitterConfig;
+	// 抗抖动配置参数
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skelot|RVO避障", meta = (DisplayName = "抗抖动配置"))
+	FSkelotAntiJitterConfig AntiJitterConfig;
 
-        //////////////////////////////////////////////////////////////////////////
-        // LOD Update Frequency System
-        // LOD 更新频率系统 - 基于距离的更新频率优化
+	//////////////////////////////////////////////////////////////////////////
+	// LOD Update Frequency System
+	// LOD 更新频率系统 - 基于距离的更新频率优化
 
-        // LOD 配置参数
-        UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skelot|LOD更新", meta = (DisplayName = "LOD配置"))
-        FSkelotLODConfig LODConfig;
+	// LOD 配置参数
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Skelot|LOD更新", meta = (DisplayName = "LOD配置"))
+	FSkelotLODConfig LODConfig;
 
-        // LOD 更新帧计数器
-        int32 LODUpdateFrameCounter = 0;
+	// LOD 更新帧计数器
+	int32 LODUpdateFrameCounter = 0;
 
-        // 相机位置缓存（用于 LOD 距离计算）
-        FVector CachedCameraLocation = FVector::ZeroVector;
+	// 相机位置缓存（用于 LOD 距离计算）
+	FVector CachedCameraLocation = FVector::ZeroVector;
 
-        //////////////////////////////////////////////////////////////////////////
-        // Obstacle System
-        // 障碍物系统 - PBD 碰撞的静态障碍物
+	//////////////////////////////////////////////////////////////////////////
+	// Obstacle System
+	// 障碍物系统 - PBD 碰撞的静态障碍物
 
-        // 已注册的障碍物列表
-        UPROPERTY(Transient)
-        TArray<TObjectPtr<ASkelotObstacle>> RegisteredObstacles;
+	// 已注册的障碍物列表
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<ASkelotObstacle>> RegisteredObstacles;
 
-        // 障碍物缓存是否需要更新
-        bool bObstaclesDirty = true;
+	// 障碍物缓存是否需要更新
+	bool bObstaclesDirty = true;
 
-        DECLARE_DELEGATE_ThreeParams(FOnWorldActorTick, ASkelotWorld*, ELevelTick, float);
+	DECLARE_DELEGATE_ThreeParams(FOnWorldActorTick, ASkelotWorld*, ELevelTick, float);
 	//
 	FOnWorldActorTick OnWorldPreActorTick_End;
 

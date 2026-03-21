@@ -667,8 +667,7 @@ TArray<FVector> USkelotGeometryTools::GetPointsByMesh(UStaticMesh* Mesh, FTransf
 		Points.Add(Point);
 	}
 #else
-	// 运行时版本暂不支持，返回空数组
-	// 可以考虑使用 Physics API 或其他运行时可用的方法
+	UE_LOG(LogTemp, Warning, TEXT("GetPointsByMesh: 此函数仅在编辑器版本可用，打包版返回空数组。Mesh=%s"), *GetNameSafe(Mesh));
 #endif
 
 	return Points;
@@ -922,7 +921,7 @@ TArray<FVector> USkelotGeometryTools::GetPointsByMeshVoxel(UStaticMesh* Mesh, FT
 		}
 	}
 #else
-	// 运行时版本暂不支持
+	UE_LOG(LogTemp, Warning, TEXT("GetPointsByMeshVoxel: 此函数仅在编辑器版本可用，打包版返回空数组。Mesh=%s"), *GetNameSafe(Mesh));
 #endif
 
 	return Points;
