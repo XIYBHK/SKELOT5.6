@@ -201,6 +201,34 @@ bool FSkelotRVOSystem::ComputeAgentAvoidance(const FSkelotInstancesSOA& SOA, int
 
 	int32 NumNeighbors = FMath::Min(LocalNeighborIndices.Num(), Config.MaxNeighbors);
 
+	// ---- 到达行为：基于速度大小和邻居密度缩放 PreferredVelocity ----
+	if (Config.ArrivalRadius > 0.0f)
+	{
+		// 速度比例：当前速度 / 最大速度，反映用户是否在减速
+		const float SpeedRatio = CurrentSpeed / FMath::Max(MaxSpeed, RVO_EPSILON);
+
+		// 当速度较低时（用户在减速趋近目标），应用到达减速
+		if (SpeedRatio < 1.0f)
+		{
+			float ArrivalFactor = 1.0f;
+
+			// 密度减速：邻居数超过阈值时进一步降速
+			if (Config.ArrivalDensityThreshold > 0 && NumNeighbors > Config.ArrivalDensityThreshold)
+			{
+				const float ExcessRatio = static_cast<float>(NumNeighbors - Config.ArrivalDensityThreshold)
+										/ static_cast<float>(Config.ArrivalDensityThreshold);
+				ArrivalFactor = 1.0f / (1.0f + ExcessRatio);
+			}
+
+			// 速度平滑减速：低速时进一步衰减
+			ArrivalFactor *= FMath::Clamp(SpeedRatio, 0.0f, 1.0f);
+
+			PreferredVelocity *= ArrivalFactor;
+			MaxSpeed *= ArrivalFactor;
+			MaxSpeed = FMath::Max(MaxSpeed, Config.MinSpeed);
+		}
+	}
+
 	FRVOAgentData& AgentData = GetOrCreateAgentData(InstanceIndex);
 	AgentData.CurrentNeighborCount = NumNeighbors;
 

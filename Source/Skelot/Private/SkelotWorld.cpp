@@ -2568,11 +2568,18 @@ void ASkelotWorld::SolvePBDCollisions(float DeltaTime)
 	// 执行障碍物碰撞求解：1次基础 + PostObstacleIterations次额外
 	if (RegisteredObstacles.Num() > 0)
 	{
-		PBDCollisionSystem.SolveObstacleCollisions(SOA, GetNumInstance(), RegisteredObstacles, DeltaTime);
+		// 仅在障碍物数据变化时重建缓存
+		if (bObstaclesDirty)
+		{
+			PBDCollisionSystem.RebuildObstacleDataCache(RegisteredObstacles);
+			bObstaclesDirty = false;
+		}
+
+		PBDCollisionSystem.SolveObstacleCollisions(SOA, GetNumInstance(), DeltaTime);
 
 		for (int32 i = 0; i < PBDConfig.PostObstacleIterations; i++)
 		{
-			PBDCollisionSystem.SolveObstacleCollisions(SOA, GetNumInstance(), RegisteredObstacles, DeltaTime);
+			PBDCollisionSystem.SolveObstacleCollisions(SOA, GetNumInstance(), DeltaTime);
 		}
 	}
 }

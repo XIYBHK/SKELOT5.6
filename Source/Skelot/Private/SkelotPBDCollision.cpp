@@ -8,18 +8,6 @@
 
 namespace
 {
-	struct FObstacleCollisionData
-	{
-		ESkelotObstacleType Type = ESkelotObstacleType::Sphere;
-		uint8 CollisionMask = 0xFF;
-		float RadiusOffset = 0.0f;
-		float SphereRadius = 0.0f;
-		FVector BoxExtent = FVector::ZeroVector;
-		FTransform Transform = FTransform::Identity;
-		FQuat Rotation = FQuat::Identity;
-		FVector Location = FVector::ZeroVector;
-	};
-
 	bool ComputeObstacleCollisionResponse(const FObstacleCollisionData& ObstacleData, const FVector& InstanceLocation,
 		float InstanceRadius, FVector& OutPushDirection, float& OutPushMagnitude)
 	{
@@ -325,17 +313,10 @@ void FSkelotPBDCollisionSystem::SolveIteration(FSkelotInstancesSOA& SOA, int32 N
 	}
 }
 
-void FSkelotPBDCollisionSystem::SolveObstacleCollisions(FSkelotInstancesSOA& SOA, int32 NumInstances,
-														 const TArray<TObjectPtr<ASkelotObstacle>>& Obstacles,
-														 float DeltaTime)
+void FSkelotPBDCollisionSystem::RebuildObstacleDataCache(const TArray<TObjectPtr<ASkelotObstacle>>& Obstacles)
 {
-	if (Obstacles.Num() == 0)
-	{
-		return;
-	}
-
-	TArray<FObstacleCollisionData> ObstacleDataArray;
-	ObstacleDataArray.Reserve(Obstacles.Num());
+	CachedObstacleData.Reset();
+	CachedObstacleData.Reserve(Obstacles.Num());
 	for (const TObjectPtr<ASkelotObstacle>& ObstaclePtr : Obstacles)
 	{
 		const ASkelotObstacle* Obstacle = ObstaclePtr.Get();
@@ -361,10 +342,13 @@ void FSkelotPBDCollisionSystem::SolveObstacleCollisions(FSkelotInstancesSOA& SOA
 			ObstacleData.BoxExtent = BoxObstacle->BoxExtent;
 		}
 
-		ObstacleDataArray.Add(ObstacleData);
+		CachedObstacleData.Add(ObstacleData);
 	}
+}
 
-	if (ObstacleDataArray.Num() == 0)
+void FSkelotPBDCollisionSystem::SolveObstacleCollisions(FSkelotInstancesSOA& SOA, int32 NumInstances, float DeltaTime)
+{
+	if (CachedObstacleData.Num() == 0)
 	{
 		return;
 	}
@@ -386,7 +370,7 @@ void FSkelotPBDCollisionSystem::SolveObstacleCollisions(FSkelotInstancesSOA& SOA
 		float LocalCorrectionSum = 0.0f;
 
 		// 遍历所有障碍物
-		for (const FObstacleCollisionData& ObstacleData : ObstacleDataArray)
+		for (const FObstacleCollisionData& ObstacleData : CachedObstacleData)
 		{
 			// 检查碰撞掩码
 			if ((InstanceCollisionMask & ObstacleData.CollisionMask) == 0)

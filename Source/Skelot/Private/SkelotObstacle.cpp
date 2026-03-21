@@ -46,6 +46,12 @@ void ASkelotObstacle::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// 缓存初始 Transform 用于运行时移动检测
+	CachedTransform = GetActorTransform();
+
+	// 启用 Tick 以检测运行时移动
+	SetActorTickEnabled(true);
+
 	// 注册到 SkelotWorld
 	ASkelotWorld* SkelotWorld = ASkelotWorld::Get(this, false);
 	if (SkelotWorld)
@@ -98,6 +104,17 @@ void ASkelotObstacle::PostEditMove(bool bFinished)
 void ASkelotObstacle::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	// 检测运行时位置/旋转变化，标记障碍物缓存脏
+	const FTransform CurrentTransform = GetActorTransform();
+	if (!CurrentTransform.Equals(CachedTransform, KINDA_SMALL_NUMBER))
+	{
+		CachedTransform = CurrentTransform;
+		if (ASkelotWorld* SkelotWorld = ASkelotWorld::Get(this, false))
+		{
+			SkelotWorld->MarkObstaclesDirty();
+		}
+	}
 
 #if WITH_EDITOR || UE_BUILD_DEVELOPMENT
 	// 调试可视化

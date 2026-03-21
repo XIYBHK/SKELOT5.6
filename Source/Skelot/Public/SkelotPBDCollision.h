@@ -4,10 +4,24 @@
 
 #include "CoreMinimal.h"
 #include "SkelotWorldBase.h"
+#include "SkelotObstacle.h"
 
 #include "SkelotPBDCollision.generated.h"
 
-class ASkelotObstacle;
+/**
+ * 障碍物碰撞数据（从 Actor 提取的纯数据，用于并行计算）
+ */
+struct FObstacleCollisionData
+{
+	ESkelotObstacleType Type = ESkelotObstacleType::Sphere;
+	uint8 CollisionMask = 0xFF;
+	float RadiusOffset = 0.0f;
+	float SphereRadius = 0.0f;
+	FVector BoxExtent = FVector::ZeroVector;
+	FTransform Transform = FTransform::Identity;
+	FQuat Rotation = FQuat::Identity;
+	FVector Location = FVector::ZeroVector;
+};
 
 /**
  * PBD 碰撞系统配置参数
@@ -136,14 +150,18 @@ public:
 						const FSkelotSpatialGrid& SpatialGrid, float DeltaTime);
 
 	/**
-	 * 执行障碍物碰撞求解
+	 * 重建障碍物碰撞数据缓存
+	 * 仅在障碍物列表或属性变化时调用
+	 */
+	void RebuildObstacleDataCache(const TArray<TObjectPtr<ASkelotObstacle>>& Obstacles);
+
+	/**
+	 * 执行障碍物碰撞求解（使用缓存数据）
 	 * @param SOA 实例数据数组
 	 * @param NumInstances 实例总数
-	 * @param Obstacles 障碍物数组
+	 * @param DeltaTime 帧时间
 	 */
-	void SolveObstacleCollisions(FSkelotInstancesSOA& SOA, int32 NumInstances,
-								 const TArray<TObjectPtr<ASkelotObstacle>>& Obstacles,
-								 float DeltaTime);
+	void SolveObstacleCollisions(FSkelotInstancesSOA& SOA, int32 NumInstances, float DeltaTime);
 
 	/** 获取统计信息：处理的碰撞对数量 */
 	int32 GetProcessedCollisionPairs() const { return ProcessedCollisionPairs; }
@@ -166,6 +184,9 @@ private:
 
 	/** 统计：总位置校正量 */
 	float TotalCorrection;
+
+	/** 障碍物碰撞数据缓存 */
+	TArray<FObstacleCollisionData> CachedObstacleData;
 
 	/**
 	 * 检查两个实例是否应该碰撞

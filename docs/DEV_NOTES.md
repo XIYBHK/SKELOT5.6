@@ -889,4 +889,18 @@ void ComputeHRVOPlane(...)
 
 ### 8. 已合并到 #3
 
+### 9. RVO 到达行为参数未接入 (2026-03-21)
+- **问题**：`FSkelotRVOConfig` 中的 `ArrivalRadius` 和 `ArrivalDensityThreshold` 参数在蓝图中可见可调，但 `SkelotRVOSystem.cpp` 中没有任何引用，调参完全无效
+- **解决**：在 `ComputeAgentAvoidance` 中，邻居查询之后、ORCA 平面构建之前，插入基于速度比例和邻居密度的到达减速逻辑。`ArrivalRadius > 0` 时启用；当速度比 < 1 且邻居数超过阈值时，缩放 PreferredVelocity 和 MaxSpeed
+- **关键规则**：声明的配置参数必须有对应的运行时逻辑引用，否则用户调参无效果
+
+### 10. 障碍物脏标记只写不读 (2026-03-21)
+- **问题**：`bObstaclesDirty` 在注册/注销/编辑器移动时被设为 true，但 `SolvePBDCollisions` 中从不读取，每帧无条件重建 `FObstacleCollisionData` 数组
+- **解决**：
+  1. 将 `FObstacleCollisionData` 从 cpp 匿名命名空间移到 `SkelotPBDCollision.h`
+  2. 在 `FSkelotPBDCollisionSystem` 中新增 `CachedObstacleData` 缓存和 `RebuildObstacleDataCache()` 方法
+  3. `SkelotWorld::SolvePBDCollisions` 中检查 `bObstaclesDirty`，dirty 时重建缓存并清除标记
+  4. `ASkelotObstacle::Tick` 中添加 `CachedTransform` 比较，运行时移动时自动标记 dirty
+- **关键规则**：脏标记优化必须覆盖所有变化路径（注册/注销/编辑器移动/运行时移动），遗漏任何一条路径会导致缓存过期
+
 *最后更新: 2026-03-21*
