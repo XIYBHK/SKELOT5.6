@@ -86,23 +86,7 @@ struct FSkelotPBDConfig
 	FSkelotPBDConfig() = default;
 
 	/** 获取推荐的默认配置 */
-	static FSkelotPBDConfig GetRecommendedConfig()
-	{
-		FSkelotPBDConfig Config;
-		Config.bEnablePBD = true;
-		Config.CollisionRadius = 60.0f;
-		Config.IterationCount = 3;
-		Config.PostObstacleIterations = 1;
-		Config.RelaxationFactor = 0.3f;
-		Config.GridCellSizeMultiplier = 1.0f;
-		Config.MaxNeighbors = 64;
-		Config.UpdateFrequency = 1;
-		Config.bEnableVelocityProjection = true;
-		Config.VelocityProjectionStrength = 0.8f;
-		Config.VelocityRecoveryRate = 2.0f;
-		Config.MaxPushForceCoefficient = 1.5f;
-		return Config;
-	}
+	static FSkelotPBDConfig GetRecommendedConfig() { return FSkelotPBDConfig{}; }
 };
 
 /**
@@ -178,6 +162,12 @@ private:
 
 	/** 临时数组：位置校正量 */
 	TArray<FVector3f> PositionCorrections;
+
+	/** 复用数组：每实例碰撞对计数 */
+	TArray<int32> PerInstancePairCounts;
+
+	/** 复用数组：每实例校正量累计 */
+	TArray<float> PerInstanceCorrectionSums;
 
 	/** 统计：处理的碰撞对数量 */
 	int32 ProcessedCollisionPairs;

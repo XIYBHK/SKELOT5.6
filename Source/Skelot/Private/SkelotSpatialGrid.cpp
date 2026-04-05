@@ -1,7 +1,7 @@
 // Copyright 2024 Lazy Marmot Games. All Rights Reserved.
 
 #include "SkelotSpatialGrid.h"
-#include "DrawDebugHelpers.h"
+#include "SkelotPrivate.h"
 
 FSkelotSpatialGrid::FSkelotSpatialGrid()
 	: CellSize(200.0f)  // 默认200厘米（2米）
@@ -47,13 +47,14 @@ FIntVector FSkelotSpatialGrid::GetCellKey(const FVector& Location) const
 void FSkelotSpatialGrid::AddInstance(int32 InstanceIndex, const FVector& Location)
 {
 	FIntVector CellKey = GetCellKey(Location);
-	TArray<int32>& CellInstances = GridCells.FindOrAdd(CellKey);
+	TArray<int32>& CellInstances = GridCells.FindOrAdd(FSkelotCellKey(CellKey));
 	CellInstances.Add(InstanceIndex);
 	TotalInstances++;
 }
 
 void FSkelotSpatialGrid::Rebuild(const FSkelotInstancesSOA& SOA, int32 NumInstances)
 {
+	SKELOT_SCOPE_CYCLE_COUNTER(SpatialGrid_Rebuild);
 	Clear();
 
 	// 预估网格大小，减少重新分配
@@ -108,7 +109,7 @@ void FSkelotSpatialGrid::ForceFullRebuild(const FSkelotInstancesSOA& SOA, int32 
 
 const TArray<int32>* FSkelotSpatialGrid::GetCellInstances(const FIntVector& CellKey) const
 {
-	return GridCells.Find(CellKey);
+	return GridCells.Find(FSkelotCellKey(CellKey));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -119,6 +120,7 @@ template<typename FilterFunc>
 void FSkelotSpatialGrid::QuerySphereInternal(const FVector& Center, float Radius, TArray<int32>& OutIndices,
 											  uint8 CollisionMask, const FSkelotInstancesSOA* SOA, FilterFunc Filter) const
 {
+	SKELOT_SCOPE_CYCLE_COUNTER(SpatialGrid_QuerySphere);
 	OutIndices.Reset();
 
 	if (Radius <= 0.0f)
@@ -126,7 +128,10 @@ void FSkelotSpatialGrid::QuerySphereInternal(const FVector& Center, float Radius
 		return;
 	}
 
-	checkf(SOA != nullptr, TEXT("QuerySphere: SOA 为空，结果精度将下降。建议传入有效的 SOA 指针。"));
+	if (!ensureMsgf(SOA != nullptr, TEXT("QuerySphere: SOA is null, results will be unfiltered")))
+	{
+		return;
+	}
 
 	const float RadiusSquared = Radius * Radius;
 	const int32 CellRadius = FMath::CeilToInt(Radius * InvCellSize);
@@ -135,12 +140,6 @@ void FSkelotSpatialGrid::QuerySphereInternal(const FVector& Center, float Radius
 
 	auto TryAddInstance = [&](int32 InstanceIndex)
 	{
-		if (!Filter(InstanceIndex))
-		{
-			return;
-		}
-
-		// 掩码过滤
 		if (CollisionMask != 0xFF && SOA)
 		{
 			if ((SOA->CollisionMasks[InstanceIndex] & CollisionMask) == 0)
@@ -149,7 +148,11 @@ void FSkelotSpatialGrid::QuerySphereInternal(const FVector& Center, float Radius
 			}
 		}
 
-		// 精确距离过滤
+		if (!Filter(InstanceIndex))
+		{
+			return;
+		}
+
 		if (SOA)
 		{
 			const FVector InstanceLocation(SOA->Locations[InstanceIndex]);
@@ -164,7 +167,7 @@ void FSkelotSpatialGrid::QuerySphereInternal(const FVector& Center, float Radius
 
 	if (CellRadius > FullScanCellRadiusThreshold)
 	{
-		for (const TPair<FIntVector, TArray<int32>>& CellPair : GridCells)
+		for (const TPair<FSkelotCellKey, TArray<int32>>& CellPair : GridCells)
 		{
 			for (int32 InstanceIndex : CellPair.Value)
 			{
@@ -181,7 +184,7 @@ void FSkelotSpatialGrid::QuerySphereInternal(const FVector& Center, float Radius
 			for (int32 dx = -CellRadius; dx <= CellRadius; dx++)
 			{
 				FIntVector CellKey = CenterCell + FIntVector(dx, dy, dz);
-				const TArray<int32>* CellInstances = GridCells.Find(CellKey);
+				const TArray<int32>* CellInstances = GridCells.Find(FSkelotCellKey(CellKey));
 
 				if (CellInstances && CellInstances->Num() > 0)
 				{
@@ -213,6 +216,7 @@ void FSkelotSpatialGrid::QuerySphereWithExclusion(const FVector& Center, float R
 void FSkelotSpatialGrid::QueryBox(const FVector& BoxCenter, const FVector& BoxExtent, TArray<int32>& OutIndices,
 								   uint8 CollisionMask, const FSkelotInstancesSOA* SOA) const
 {
+	SKELOT_SCOPE_CYCLE_COUNTER(SpatialGrid_QueryBox);
 	OutIndices.Reset();
 
 	// 计算需要检查的网格范围
@@ -230,7 +234,7 @@ void FSkelotSpatialGrid::QueryBox(const FVector& BoxCenter, const FVector& BoxEx
 			for (int32 x = MinCell.X; x <= MaxCell.X; x++)
 			{
 				FIntVector CellKey(x, y, z);
-				const TArray<int32>* CellInstances = GridCells.Find(CellKey);
+				const TArray<int32>* CellInstances = GridCells.Find(FSkelotCellKey(CellKey));
 
 				if (CellInstances && CellInstances->Num() > 0)
 				{
@@ -269,22 +273,4 @@ void FSkelotSpatialGrid::QueryBox(const FVector& BoxCenter, const FVector& BoxEx
 	}
 }
 
-namespace SkelotSpatialGridDebug
-{
-	void DrawGridBounds(const FSkelotSpatialGrid& Grid, const FVector& ViewCenter, float DrawRadius, const FColor& Color, float LifeTime)
-	{
-		// 在编辑器中绘制网格边界
-		// 注意：这需要在有 WorldContext 的环境中调用
-	}
 
-	void DrawCell(const FIntVector& CellKey, float CellSize, const FColor& Color, float LifeTime)
-	{
-		// 计算单元的世界空间边界
-		FVector MinCorner(CellKey.X * CellSize, CellKey.Y * CellSize, CellKey.Z * CellSize);
-		FVector MaxCorner = MinCorner + FVector(CellSize);
-
-		// 绘制单元边界框
-		// 注意：这需要在有 WorldContext 的环境中调用
-		// DrawDebugBox(...);
-	}
-}

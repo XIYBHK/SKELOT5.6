@@ -6,6 +6,26 @@
 #include "SkelotWorldBase.h"
 
 /**
+ * 空间网格 Cell 键（自定义空间哈希函数，遵循 Epic 的 RenderingSpatialHash 质数方案）
+ * 相比默认 FIntVector hash，空间质数分布更均匀，减少 TMap bucket 碰撞
+ */
+struct FSkelotCellKey
+{
+	FIntVector Coord;
+
+	FSkelotCellKey() = default;
+	explicit FSkelotCellKey(const FIntVector& InCoord) : Coord(InCoord) {}
+
+	bool operator==(const FSkelotCellKey& Other) const { return Coord == Other.Coord; }
+
+	friend FORCEINLINE uint32 GetTypeHash(const FSkelotCellKey& Key)
+	{
+		// Epic's RenderingSpatialHash.h spatial primes for uniform distribution
+		return uint32(uint32(Key.Coord.X) * 1150168907u + uint32(Key.Coord.Y) * 1235029793u + uint32(Key.Coord.Z) * 1282581571u);
+	}
+};
+
+/**
  * 空间哈希网格 - 用于高效的空间查询
  *
  * 将世界空间划分为固定大小的网格单元，每个单元存储该区域内的实例索引。
@@ -148,7 +168,7 @@ private:
 	int32 CurrentFrameIndex;
 
 	/** 网格单元映射：CellKey -> 实例索引数组 */
-	TMap<FIntVector, TArray<int32>> GridCells;
+	TMap<FSkelotCellKey, TArray<int32>> GridCells;
 
 	/** 总实例数（统计用） */
 	int32 TotalInstances;
@@ -162,14 +182,4 @@ private:
 							 uint8 CollisionMask, const FSkelotInstancesSOA* SOA, FilterFunc Filter) const;
 };
 
-/**
- * 空间网格调试绘制工具
- */
-namespace SkelotSpatialGridDebug
-{
-	/** 绘制网格边界 */
-	void DrawGridBounds(const FSkelotSpatialGrid& Grid, const FVector& ViewCenter, float DrawRadius, const FColor& Color, float LifeTime = -1.0f);
 
-	/** 绘制指定单元 */
-	void DrawCell(const FIntVector& CellKey, float CellSize, const FColor& Color, float LifeTime = -1.0f);
-}

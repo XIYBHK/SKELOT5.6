@@ -65,17 +65,10 @@ class FSkelotRVOSystem
 public:
 	FSkelotRVOSystem();
 
-	/** 设置 RVO 配置 */
-	void SetConfig(const FSkelotRVOConfig& InConfig);
-
-	/** 获取 RVO 配置 */
-	const FSkelotRVOConfig& GetConfig() const;
-
-	/** 设置抗抖动配置 */
-	void SetAntiJitterConfig(const FSkelotAntiJitterConfig& InConfig);
-
-	/** 获取抗抖动配置 */
-	const FSkelotAntiJitterConfig& GetAntiJitterConfig() const;
+	void SetConfig(const FSkelotRVOConfig& InConfig) { Config = InConfig; }
+	const FSkelotRVOConfig& GetConfig() const { return Config; }
+	void SetAntiJitterConfig(const FSkelotAntiJitterConfig& InConfig) { AntiJitterConfig = InConfig; }
+	const FSkelotAntiJitterConfig& GetAntiJitterConfig() const { return AntiJitterConfig; }
 
 	/**
 	 * 执行 RVO 避障计算

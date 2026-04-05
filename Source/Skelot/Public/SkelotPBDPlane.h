@@ -23,24 +23,19 @@ struct FSkelotRVOConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO")
 	bool bEnableRVO = true;
 
-	/** RVO邻居半径（厘米）- 约为碰撞半径的4-6倍 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO", meta = (ClampMin = "100", ClampMax = "800"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO", meta = (ClampMin = "100", ClampMax = "800", UIMin = "100", UIMax = "800", ForceUnits = "cm", EditCondition = "bEnableRVO"))
 	float NeighborRadius = 300.0f;
 
-	/** RVO时间窗（秒）- 越大越提前避障，但可能过度绕行 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO", meta = (ClampMin = "0.1", ClampMax = "2.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO", meta = (ClampMin = "0.1", ClampMax = "2.0", UIMin = "0.1", UIMax = "2.0", ForceUnits = "s", EditCondition = "bEnableRVO"))
 	float TimeHorizon = 1.0f;
 
-	/** RVO最大速度（厘米/秒）- 0表示使用当前速度 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO", meta = (ClampMin = "0", ClampMax = "1000"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO", meta = (ClampMin = "0", ClampMax = "1000", UIMin = "0", UIMax = "1000", ForceUnits = "cm/s", EditCondition = "bEnableRVO"))
 	float MaxSpeed = 0.0f;
 
-	/** RVO最小速度（厘米/秒）- 防止完全停止 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO", meta = (ClampMin = "0", ClampMax = "200"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO", meta = (ClampMin = "0", ClampMax = "200", UIMin = "0", UIMax = "200", ForceUnits = "cm/s", EditCondition = "bEnableRVO"))
 	float MinSpeed = 50.0f;
 
-	/** 到达半径（厘米）- 接近目标时减速范围 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO", meta = (ClampMin = "50", ClampMax = "500"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO", meta = (ClampMin = "50", ClampMax = "500", UIMin = "50", UIMax = "500", ForceUnits = "cm", EditCondition = "bEnableRVO"))
 	float ArrivalRadius = 200.0f;
 
 	/** 到达密度阈值 - 防止目标点过度拥挤 */
@@ -51,43 +46,23 @@ struct FSkelotRVOConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO", meta = (ClampMin = "4", ClampMax = "32"))
 	int32 MaxNeighbors = 16;
 
-	/** RVO分帧步长 - 2可降低50%计算量 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO", meta = (ClampMin = "1", ClampMax = "4"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO", AdvancedDisplay, meta = (ClampMin = "1", ClampMax = "4", UIMin = "1", UIMax = "4", EditCondition = "bEnableRVO"))
 	int32 FrameStride = 1;
 
 	/** 是否启用HRVO混合模式 - 结合RVO和VO的优点，解决迎面相遇时的振荡问题 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO")
 	bool bEnableHRVO = false;
 
-	/** HRVO迎面检测阈值 - 当相对速度与相对位置方向相反程度超过此值时使用VO */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO", meta = (ClampMin = "-1.0", ClampMax = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO", AdvancedDisplay, meta = (ClampMin = "-1.0", ClampMax = "0.0", UIMin = "-1.0", UIMax = "0.0", EditCondition = "bEnableHRVO"))
 	float HRVOHeadOnThreshold = -0.5f;
 
-	/** 邻居高度差过滤阈值（厘米）- 高度差超过此值的实例不参与避障，0表示不过滤 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO", meta = (ClampMin = "0", ClampMax = "1000"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVO", AdvancedDisplay, meta = (ClampMin = "0", ClampMax = "1000", UIMin = "0", UIMax = "1000", ForceUnits = "cm", EditCondition = "bEnableRVO"))
 	float HeightDifferenceThreshold = 200.0f;
 
 	/** 默认构造 */
 	FSkelotRVOConfig() = default;
 
-	/** 获取推荐的默认配置 */
-	static FSkelotRVOConfig GetRecommendedConfig()
-	{
-		FSkelotRVOConfig Config;
-		Config.bEnableRVO = true;
-		Config.NeighborRadius = 300.0f;
-		Config.TimeHorizon = 1.0f;
-		Config.MaxSpeed = 0.0f;
-		Config.MinSpeed = 50.0f;
-		Config.ArrivalRadius = 200.0f;
-		Config.ArrivalDensityThreshold = 6;
-		Config.MaxNeighbors = 16;
-		Config.FrameStride = 1;
-		Config.bEnableHRVO = false;
-		Config.HRVOHeadOnThreshold = -0.5f;
-		Config.HeightDifferenceThreshold = 200.0f;
-		return Config;
-	}
+	static FSkelotRVOConfig GetRecommendedConfig() { return FSkelotRVOConfig{}; }
 };
 
 /**
@@ -104,51 +79,33 @@ struct FSkelotAntiJitterConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "抗抖动")
 	bool bEnableDensityAdaptation = true;
 
-	/** 密度阈值 - 邻居数超过此值触发自适应 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "抗抖动", meta = (ClampMin = "1", ClampMax = "20"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "抗抖动", meta = (ClampMin = "1", ClampMax = "20", UIMin = "1", UIMax = "20", EditCondition = "bEnableDensityAdaptation"))
 	int32 DensityThreshold = 8;
 
-	/** 高密度松弛系数 - 高密度时的松弛系数 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "抗抖动", meta = (ClampMin = "0.1", ClampMax = "1.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "抗抖动", meta = (ClampMin = "0.1", ClampMax = "1.0", UIMin = "0.1", UIMax = "1.0", EditCondition = "bEnableDensityAdaptation"))
 	float HighDensityRelaxation = 0.3f;
 
 	/** 启用速度平滑 - 平滑速度变化防止抖动 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "抗抖动")
 	bool bEnableVelocitySmoothing = true;
 
-	/** 速度平滑系数 - 越大越平滑，但响应变慢 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "抗抖动", meta = (ClampMin = "0.05", ClampMax = "0.5"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "抗抖动", meta = (ClampMin = "0.05", ClampMax = "0.5", UIMin = "0.05", UIMax = "0.5", EditCondition = "bEnableVelocitySmoothing"))
 	float VelocitySmoothFactor = 0.15f;
 
 	/** 启用抖动检测 - 自动检测并抑制抖动 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "抗抖动")
 	bool bEnableJitterDetection = true;
 
-	/** 抖动检测阈值 - 方向变化超过此值视为抖动 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "抗抖动", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "抗抖动", meta = (ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0", EditCondition = "bEnableJitterDetection"))
 	float JitterThreshold = 0.7f;
 
-	/** 抖动抑制强度 - 检测到抖动时的抑制力度 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "抗抖动", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "抗抖动", meta = (ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0", EditCondition = "bEnableJitterDetection"))
 	float JitterSuppression = 0.5f;
 
 	/** 默认构造 */
 	FSkelotAntiJitterConfig() = default;
 
-	/** 获取推荐的默认配置 */
-	static FSkelotAntiJitterConfig GetRecommendedConfig()
-	{
-		FSkelotAntiJitterConfig Config;
-		Config.bEnableDensityAdaptation = true;
-		Config.DensityThreshold = 8;
-		Config.HighDensityRelaxation = 0.3f;
-		Config.bEnableVelocitySmoothing = true;
-		Config.VelocitySmoothFactor = 0.15f;
-		Config.bEnableJitterDetection = true;
-		Config.JitterThreshold = 0.7f;
-		Config.JitterSuppression = 0.5f;
-		return Config;
-	}
+	static FSkelotAntiJitterConfig GetRecommendedConfig() { return FSkelotAntiJitterConfig{}; }
 };
 
 /**
@@ -166,26 +123,16 @@ struct FSkelotLODConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LOD")
 	bool bEnableLODUpdateFrequency = false;
 
-	/** 中距离阈值（厘米）- 超过后每2帧更新 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LOD", meta = (ClampMin = "100", ClampMax = "10000"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LOD", meta = (ClampMin = "100", ClampMax = "10000", UIMin = "100", UIMax = "10000", ForceUnits = "cm", EditCondition = "bEnableLODUpdateFrequency"))
 	float MediumDistance = 2000.0f;
 
-	/** 远距离阈值（厘米）- 超过后每4帧更新 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LOD", meta = (ClampMin = "100", ClampMax = "20000"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LOD", meta = (ClampMin = "100", ClampMax = "20000", UIMin = "100", UIMax = "20000", ForceUnits = "cm", EditCondition = "bEnableLODUpdateFrequency"))
 	float FarDistance = 5000.0f;
 
 	/** 默认构造 */
 	FSkelotLODConfig() = default;
 
-	/** 获取推荐的默认配置 */
-	static FSkelotLODConfig GetRecommendedConfig()
-	{
-		FSkelotLODConfig Config;
-		Config.bEnableLODUpdateFrequency = false;
-		Config.MediumDistance = 2000.0f;
-		Config.FarDistance = 5000.0f;
-		return Config;
-	}
+	static FSkelotLODConfig GetRecommendedConfig() { return FSkelotLODConfig{}; }
 };
 
 /**

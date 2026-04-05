@@ -1,6 +1,7 @@
 // Copyright 2024 Lazy Marmot Games. All Rights Reserved.
 
 #include "SkelotRVOSystem.h"
+#include "SkelotPrivate.h"
 #include "SkelotSpatialGrid.h"
 #include "SkelotPBDPlane.h"
 #include "SkelotWorld.h"
@@ -27,26 +28,6 @@ FSkelotRVOSystem::FSkelotRVOSystem()
 //////////////////////////////////////////////////////////////////////////
 // Public API
 //////////////////////////////////////////////////////////////////////////
-
-void FSkelotRVOSystem::SetConfig(const FSkelotRVOConfig& InConfig)
-{
-	Config = InConfig;
-}
-
-const FSkelotRVOConfig& FSkelotRVOSystem::GetConfig() const
-{
-	return Config;
-}
-
-void FSkelotRVOSystem::SetAntiJitterConfig(const FSkelotAntiJitterConfig& InConfig)
-{
-	AntiJitterConfig = InConfig;
-}
-
-const FSkelotAntiJitterConfig& FSkelotRVOSystem::GetAntiJitterConfig() const
-{
-	return AntiJitterConfig;
-}
 
 void FSkelotRVOSystem::ResetStats()
 {
@@ -113,31 +94,28 @@ void FSkelotRVOSystem::ComputeAvoidance(FSkelotInstancesSOA& SOA, int32 NumInsta
 	// 保存碰撞半径
 	CurrentCollisionRadius = CollisionRadius;
 
-	// 重置统计
+	SKELOT_SCOPE_CYCLE_COUNTER(RVO_ComputeAvoidance);
+
 	ResetStats();
 	EnsureAgentDataCapacity(NumInstances);
 
-	// 分帧更新检查
 	FrameCounter = (FrameCounter + 1) % Config.FrameStride;
 	TArray<uint8> UpdatedFlags;
 	UpdatedFlags.SetNumZeroed(NumInstances);
 	TArray<FVector3f> InputVelocities;
 	InputVelocities.SetNumUninitialized(NumInstances);
-	for (int32 InstanceIndex = 0; InstanceIndex < NumInstances; ++InstanceIndex)
-	{
-		InputVelocities[InstanceIndex] = SOA.Velocities[InstanceIndex];
-	}
-	TArray<FVector3f> OutputVelocities = InputVelocities;
+	FMemory::Memcpy(InputVelocities.GetData(), SOA.Velocities.GetData(), NumInstances * sizeof(FVector3f));
+	TArray<FVector3f> OutputVelocities;
+	OutputVelocities.SetNumUninitialized(NumInstances);
+	FMemory::Memcpy(OutputVelocities.GetData(), InputVelocities.GetData(), NumInstances * sizeof(FVector3f));
 
-	ParallelFor(NumInstances, [&](int32 InstanceIndex)
+	ParallelFor(TEXT("RVO_ComputeAvoidance"), NumInstances, 1, [&](int32 InstanceIndex)
 	{
-		// 跳过已销毁的实例
 		if (SOA.Slots[InstanceIndex].bDestroyed)
 		{
 			return;
 		}
 
-		// 分帧更新：只处理当前帧对应的实例
 		if (Config.FrameStride > 1 && (InstanceIndex % Config.FrameStride) != FrameCounter)
 		{
 			return;

@@ -1,6 +1,7 @@
 // Copyright 2024 Lazy Marmot Games. All Rights Reserved.
 
 #include "SkelotPBDCollision.h"
+#include "SkelotPrivate.h"
 #include "SkelotSpatialGrid.h"
 #include "SkelotObstacle.h"
 #include "SkelotWorld.h"
@@ -204,6 +205,7 @@ void FSkelotPBDCollisionSystem::ApplyVelocityProjection(FSkelotInstancesSOA& SOA
 void FSkelotPBDCollisionSystem::SolveCollisions(FSkelotInstancesSOA& SOA, int32 NumInstances,
 												const FSkelotSpatialGrid& SpatialGrid, float DeltaTime)
 {
+	SKELOT_SCOPE_CYCLE_COUNTER(PBD_SolveCollisions);
 	if (!Config.bEnablePBD || NumInstances == 0)
 	{
 		return;
@@ -226,26 +228,24 @@ void FSkelotPBDCollisionSystem::SolveCollisions(FSkelotInstancesSOA& SOA, int32 
 void FSkelotPBDCollisionSystem::SolveIteration(FSkelotInstancesSOA& SOA, int32 NumInstances,
 											   const FSkelotSpatialGrid& SpatialGrid, float DeltaTime)
 {
-	TArray<int32> PerInstancePairCounts;
-	TArray<float> PerInstanceCorrectionSums;
-	PerInstancePairCounts.SetNumZeroed(NumInstances);
-	PerInstanceCorrectionSums.SetNumZeroed(NumInstances);
+	SKELOT_SCOPE_CYCLE_COUNTER(PBD_SolveIteration);
+	PerInstancePairCounts.SetNumUninitialized(NumInstances);
+	FMemory::Memzero(PerInstancePairCounts.GetData(), NumInstances * sizeof(int32));
+	PerInstanceCorrectionSums.SetNumUninitialized(NumInstances);
+	FMemory::Memzero(PerInstanceCorrectionSums.GetData(), NumInstances * sizeof(float));
 
-	ParallelFor(NumInstances, [&](int32 InstanceIndex)
+	ParallelFor(TEXT("PBD_SolveIteration"), NumInstances, 1, [&](int32 InstanceIndex)
 	{
-		// 跳过已销毁的实例
 		if (SOA.Slots[InstanceIndex].bDestroyed)
 		{
 			return;
 		}
 
-		// 获取当前位置
 		const FVector3d& MyPos = SOA.Locations[InstanceIndex];
 		FVector3f AccumulatedCorrection = FVector3f::ZeroVector;
 		int32 LocalPairCount = 0;
 		float LocalCorrectionSum = 0.0f;
 
-		// 使用空间网格查询邻居（线程局部缓存，预分配减少堆扩容）
 		TArray<int32> LocalNeighborIndices;
 		LocalNeighborIndices.Reserve(Config.MaxNeighbors);
 		SpatialGrid.QuerySphere(FVector(MyPos), Config.CollisionRadius * 2.0f, LocalNeighborIndices, 0xFF, &SOA);
@@ -348,17 +348,17 @@ void FSkelotPBDCollisionSystem::RebuildObstacleDataCache(const TArray<TObjectPtr
 
 void FSkelotPBDCollisionSystem::SolveObstacleCollisions(FSkelotInstancesSOA& SOA, int32 NumInstances, float DeltaTime)
 {
+	SKELOT_SCOPE_CYCLE_COUNTER(PBD_SolveObstacleCollisions);
 	if (CachedObstacleData.Num() == 0)
 	{
 		return;
 	}
 
-	TArray<float> PerInstanceCorrectionSums;
-	PerInstanceCorrectionSums.SetNumZeroed(NumInstances);
+	TArray<float> ObstacleCorrectionSums;
+	ObstacleCorrectionSums.SetNumZeroed(NumInstances);
 
-	ParallelFor(NumInstances, [&](int32 InstanceIndex)
+	ParallelFor(TEXT("PBD_SolveObstacles"), NumInstances, 1, [&](int32 InstanceIndex)
 	{
-		// 跳过已销毁的实例
 		if (SOA.Slots[InstanceIndex].bDestroyed)
 		{
 			return;
@@ -369,10 +369,8 @@ void FSkelotPBDCollisionSystem::SolveObstacleCollisions(FSkelotInstancesSOA& SOA
 		uint8 InstanceCollisionMask = SOA.CollisionMasks[InstanceIndex];
 		float LocalCorrectionSum = 0.0f;
 
-		// 遍历所有障碍物
 		for (const FObstacleCollisionData& ObstacleData : CachedObstacleData)
 		{
-			// 检查碰撞掩码
 			if ((InstanceCollisionMask & ObstacleData.CollisionMask) == 0)
 			{
 				continue;
@@ -383,7 +381,6 @@ void FSkelotPBDCollisionSystem::SolveObstacleCollisions(FSkelotInstancesSOA& SOA
 
 			if (ComputeObstacleCollisionResponse(ObstacleData, InstanceLocation, InstanceRadius, PushDirection, PushMagnitude))
 			{
-				// 应用位置校正（使用松弛系数）
 				FVector3f Correction = FVector3f(PushDirection * PushMagnitude * Config.RelaxationFactor);
 				SOA.Locations[InstanceIndex] += FVector3d(Correction);
 				InstanceLocation += FVector(Correction);
@@ -393,10 +390,10 @@ void FSkelotPBDCollisionSystem::SolveObstacleCollisions(FSkelotInstancesSOA& SOA
 			}
 		}
 
-		PerInstanceCorrectionSums[InstanceIndex] = LocalCorrectionSum;
+		ObstacleCorrectionSums[InstanceIndex] = LocalCorrectionSum;
 	});
 
-	for (float CorrectionSum : PerInstanceCorrectionSums)
+	for (float CorrectionSum : ObstacleCorrectionSums)
 	{
 		TotalCorrection += CorrectionSum;
 	}

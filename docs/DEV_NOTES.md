@@ -903,4 +903,17 @@ void ComputeHRVOPlane(...)
   4. `ASkelotObstacle::Tick` 中添加 `CachedTransform` 比较，运行时移动时自动标记 dirty
 - **关键规则**：脏标记优化必须覆盖所有变化路径（注册/注销/编辑器移动/运行时移动），遗漏任何一条路径会导致缓存过期
 
-*最后更新: 2026-03-21*
+### 11. TArray TInlineAllocator 类型不兼容 (2026-04-04)
+- **问题**：为消除 ParallelFor lambda 内堆分配，将 `TArray<int32>` 改为 `TArray<int32, TInlineAllocator<64>>`，编译报错 `无法从 TArray<int32, TSizedInlineAllocator<64>> 转换为 TArray<int32>&`
+- **原因**：UE 的 `TArray<T, AllocatorA>` 和 `TArray<T, AllocatorB>` 是完全不同的模板特化类型，不能隐式转换或互传引用。`QuerySphere` 接受 `TArray<int32>&`，`LinearProgram2/3` 接受 `const TArray<FORCAPlane>&`，这些签名与 TInlineAllocator 版本不兼容
+- **解决**：回退为普通 `TArray<T>` + `Reserve()`，保留其他已应用的优化（ParallelFor DebugName/MinBatchSize、Memcpy、成员数组复用等）
+- **关键规则**：在 UE 中使用 `TInlineAllocator` 时，**必须确保下游函数签名也使用相同的 Allocator 类型**，否则需要将下游函数模板化为 `template<typename AllocatorType> void Func(TArray<T, AllocatorType>&)`
+
+### 12. UE 最佳实践审查要点 (2026-04-04)
+- **Stats Profiling**：扩展子系统必须用 `SKELOT_SCOPE_CYCLE_COUNTER` 包裹热函数，否则 UE Profiler 中不可见
+- **ParallelFor**：必须传 `TEXT("Name")` + MinBatchSize，参照 `PhysScene_Chaos.cpp` 和 `NaniteStreamingManager.cpp`
+- **空间网格容器**：Epic 在 `HierarchicalHashGrid2D.h` 中用 `TSet<FCell>` + 空间质数 hash，在 `SimpleCellGrid.h` 中用 `TArray` flat indexing，从不用 TMap
+- **checkf vs ensure**：`checkf` 在 Shipping build 中被移除（表达式不执行），用 `ensureMsgf` 做运行时验证 + 优雅降级
+- **UPROPERTY meta**：参照 `CharacterMovementComponent.h`，数值属性必须有 UIMin/UIMax、ForceUnits、EditCondition
+
+*最后更新: 2026-04-04*
